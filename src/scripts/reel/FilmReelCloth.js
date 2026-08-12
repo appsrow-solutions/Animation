@@ -19,7 +19,6 @@ const SCROLL_SMOOTH = 0.14;
 const VIDEO_PAINT_MS = 100;
 const VIDEO_PAINT_MAX = 2;
 const IDLE_COOLDOWN_FRAMES = 18;
-const REEL_MEDIA_ASPECT_CORRECTION = 1.18;
 
 const DEMO_PANEL_W = 3.84;
 const DEMO_HANG_H = 2.7;
@@ -81,6 +80,7 @@ export default class FilmReelCloth {
       clothRows = ROWS,
       constraintIterations = CONSTRAINT_ITERATIONS,
       videoPaintMax = VIDEO_PAINT_MAX,
+      slotAspects = [],
     } = options;
 
     this.zOffset = zOffset;
@@ -100,6 +100,9 @@ export default class FilmReelCloth {
     this.cardDrop = cardDrop;
     this.cardCount = Math.max(0, cardCount);
     this.gridRows = Math.ceil(this.cardCount / this.gridCols) || 1;
+    this.slotAspects = slotAspects.length
+      ? slotAspects
+      : Array(this.cardCount).fill(cardW / Math.max(cardH, 1));
 
     this.panelW = Math.max(
       width,
@@ -115,14 +118,18 @@ export default class FilmReelCloth {
     this.meshBottom = -this.hangH * 0.5;
     this.meshTop = this.seamY + this.arcLen;
 
-    this.cardsH =
-      this.gridRows * this.cardH + Math.max(0, this.gridRows - 1) * this.gapY;
+    this.cardsH = this.computeCardsH();
     this.rollMargin = this.arcLen + 0.1 * (this.hangH / DEMO_HANG_H);
     this.bottomBreath = this.cardH * 0.02;
     this.contentH =
       this.rollMargin + this.cardDrop + this.cardsH + this.bottomBreath;
-    const lastSlotBottom =
-      this.rollMargin + this.cardDrop + this.cardsH;
+
+    this.buildSlots();
+
+    const lastSlot = this.slots[this.slots.length - 1];
+    const lastSlotBottom = lastSlot
+      ? lastSlot.y + lastSlot.h
+      : this.rollMargin + this.cardDrop;
     const endClearance = this.bottomBreath + this.cardH * SCROLL_END_CLEARANCE;
     this.maxScroll = Math.max(0, lastSlotBottom - this.hangH + endClearance);
 
@@ -139,21 +146,60 @@ export default class FilmReelCloth {
     this._idleCooldown = IDLE_COOLDOWN_FRAMES;
     this._lastScroll = 0;
 
-    this.buildSlots();
     this.ensureMediaArray();
     this.rebuildMesh();
   }
 
+  slotHeightFor(i) {
+    const entry = this.media[i];
+    const liveAspect = entry?.source ? this.sourceAspect(entry.source) : 0;
+    const aspect =
+      liveAspect ||
+      this.slotAspects[i] ||
+      this.cardW / Math.max(this.cardH, 1);
+    return (this.cardW / Math.max(aspect, 0.1)) * this.mediaHeightBoost;
+  }
+
+  rowHeightFor(row) {
+    let maxH = 0;
+    for (let col = 0; col < this.gridCols; col++) {
+      const index = row * this.gridCols + col;
+      if (index >= this.cardCount) break;
+      maxH = Math.max(maxH, this.slotHeightFor(index));
+    }
+    return maxH;
+  }
+
+  computeCardsH() {
+    let total = 0;
+    for (let row = 0; row < this.gridRows; row++) {
+      if (row > 0) total += this.gapY;
+      total += this.rowHeightFor(row);
+    }
+    return total;
+  }
+
   buildSlots() {
     this.slots = [];
+    const rowTops = [];
+    let y = this.rollMargin + this.cardDrop;
+
+    for (let row = 0; row < this.gridRows; row++) {
+      rowTops[row] = y;
+      y += this.rowHeightFor(row) + this.gapY;
+    }
+
     for (let i = 0; i < this.cardCount; i++) {
       const col = i % this.gridCols;
       const row = Math.floor(i / this.gridCols);
+      const h = this.slotHeightFor(i);
+      const rowH = this.rowHeightFor(row);
+
       this.slots.push({
         x: this.pad + col * (this.cardW + this.gapX),
-        y: this.rollMargin + this.cardDrop + row * (this.cardH + this.gapY),
+        y: rowTops[row] + (rowH - h) * 0.5,
         w: this.cardW,
-        h: this.cardH,
+        h,
       });
     }
   }
@@ -396,33 +442,58 @@ export default class FilmReelCloth {
     ctx.restore();
   }
 
-  drawCover(source, s) {
+  sourceAspect(source) {
+    const sw = source.videoWidth || source.naturalWidth || source.width || 0;
+    const sh = source.videoHeight || source.naturalHeight || source.height || 0;
+    if (sw < 2 || sh < 2) return 0;
+    return sw / sh;
+  }
+
+  syncSlotAspect(i, source) {
+    const aspect = this.sourceAspect(source);
+    if (aspect <= 0) return false;
+    const prev = this.slotAspects[i] || this.cardW / Math.max(this.cardH, 1);
+    if (Math.abs(aspect - prev) / Math.max(prev, 0.001) < 0.004) return false;
+    this.slotAspects[i] = aspect;
+    return true;
+  }
+
+  relayoutSlots() {
+    const prevContentH = this.contentH;
+    this.cardsH = this.computeCardsH();
+    this.contentH =
+      this.rollMargin + this.cardDrop + this.cardsH + this.bottomBreath;
+    this.buildSlots();
+
+    const lastSlot = this.slots[this.slots.length - 1];
+    const lastSlotBottom = lastSlot
+      ? lastSlot.y + lastSlot.h
+      : this.rollMargin + this.cardDrop;
+    const endClearance = this.bottomBreath + this.cardH * SCROLL_END_CLEARANCE;
+    this.maxScroll = Math.max(0, lastSlotBottom - this.hangH + endClearance);
+
+    if (Math.abs(this.contentH - prevContentH) > 1) {
+      this.buildTexture();
+      if (this.mesh.material) {
+        this.mesh.material.map = this.texture;
+        this.mesh.material.needsUpdate = true;
+      }
+    }
+
+    this.syncUV();
+    this.paintAllSlots();
+  }
+
+  // Slot matches media aspect — draw 1:1, no letterbox or stretch
+  drawMedia(source, s) {
     const ctx = this.ctx;
     const sw = source.videoWidth || source.naturalWidth || source.width || 1;
     const sh = source.videoHeight || source.naturalHeight || source.height || 1;
-    const corr = REEL_MEDIA_ASPECT_CORRECTION;
-    const ir = (sw / sh) * corr;
-    const sr = s.w / s.h;
-    let sx;
-    let sy;
-    let cw;
-    let ch;
-    if (ir > sr) {
-      ch = sh;
-      cw = (ch * sr) / corr;
-      sx = (sw - cw) * 0.5;
-      sy = 0;
-    } else {
-      cw = sw;
-      ch = (cw / sr) * corr;
-      sx = 0;
-      sy = (sh - ch) * 0.5;
-    }
 
     ctx.save();
     this.roundRect(ctx, s.x, s.y, s.w, s.h, 4);
     ctx.clip();
-    ctx.drawImage(source, sx, sy, cw, ch, s.x, s.y, s.w, s.h);
+    ctx.drawImage(source, 0, 0, sw, sh, s.x, s.y, s.w, s.h);
     ctx.restore();
 
     ctx.save();
@@ -472,15 +543,27 @@ export default class FilmReelCloth {
     }
 
     try {
+      if (entry.type === "video" && entry.source.readyState >= 2) {
+        if (this.syncSlotAspect(i, entry.source)) {
+          this.relayoutSlots();
+          return;
+        }
+      } else if (entry.type === "image" && entry.source) {
+        if (this.syncSlotAspect(i, entry.source)) {
+          this.relayoutSlots();
+          return;
+        }
+      }
+
       if (entry.type === "video") {
         if (entry.source.readyState >= 2) {
-          this.drawCover(entry.source, s);
+          this.drawMedia(entry.source, s);
           if (chrome) this.paintSlotChrome(i, s);
         } else {
           this.drawFallback(i, s);
         }
       } else {
-        this.drawCover(entry.source, s);
+        this.drawMedia(entry.source, s);
         if (chrome) this.paintSlotChrome(i, s);
       }
     } catch {
@@ -496,6 +579,10 @@ export default class FilmReelCloth {
   setSlotImage(i, image) {
     if (i < 0 || i >= this.cardCount) return;
     this.media[i] = { type: "image", source: image, dirty: true };
+    if (this.syncSlotAspect(i, image)) {
+      this.relayoutSlots();
+      return;
+    }
     this.paintSlot(i);
     this.texture.needsUpdate = true;
   }
@@ -503,6 +590,10 @@ export default class FilmReelCloth {
   setSlotVideo(i, video) {
     if (i < 0 || i >= this.cardCount) return;
     this.media[i] = { type: "video", source: video, dirty: true };
+    if (video.readyState >= 2 && this.syncSlotAspect(i, video)) {
+      this.relayoutSlots();
+      return;
+    }
     this.paintSlot(i);
     this.texture.needsUpdate = true;
   }
@@ -513,22 +604,12 @@ export default class FilmReelCloth {
     if (now - this._lastVideoPaint < VIDEO_PAINT_MS) return;
     this._lastVideoPaint = now;
 
-    const { top, bottom } = this.getVisibleDepthRange();
-    const center = (top + bottom) * 0.5;
-    const ranked = [];
+    let dirty = false;
     for (const i of indexes) {
       const entry = this.media[i];
       if (!entry || entry.type !== "video" || !entry.source) continue;
       if (entry.source.readyState < 2) continue;
-      const s = this.slots[i];
-      if (!s) continue;
-      ranked.push({ i, dist: Math.abs(s.y + s.h * 0.5 - center) });
-    }
-    ranked.sort((a, b) => a.dist - b.dist);
-
-    let dirty = false;
-    for (let n = 0; n < Math.min(this.videoPaintMax, ranked.length); n++) {
-      this.paintSlot(ranked[n].i, { chrome: true });
+      this.paintSlot(i, { chrome: true });
       dirty = true;
     }
     if (dirty && this.texture) this.texture.needsUpdate = true;

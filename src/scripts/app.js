@@ -264,18 +264,12 @@ export default class Sketch {
     return Number.isFinite(zoom) && zoom > 0 ? zoom : VIDEO_ZOOM;
   }
 
-  // Map media into the taller card geometry without squashing circles.
   applyMediaFitUniforms(material, index, mediaAspect) {
-    const zoom = this.getProjectZoom(index);
-
     material.uniforms.u_imageAspect.value = mediaAspect;
     material.uniforms.u_cardAspect.value = mediaAspect;
-    material.uniforms.u_videoZoom.value = zoom;
-    // Cards are CARD_HEIGHT_BOOST taller than media aspect — undo that in the shader
-    // for zoomed clips so spheres stay round instead of oval.
-    material.uniforms.u_heightBoost.value =
-      zoom > 1.001 ? CARD_HEIGHT_BOOST : 1.0;
-    material.uniforms.u_fitContain.value = 2.0;
+    material.uniforms.u_videoZoom.value = 1.0;
+    material.uniforms.u_heightBoost.value = 1.0;
+    material.uniforms.u_fitContain.value = 1.0;
   }
 
   getCardHeight(cardWidth = this.cardWidth) {
@@ -342,6 +336,7 @@ export default class Sketch {
       pad,
       cardDrop,
       cardCount: projects.length,
+      slotAspects: projects.map((_, i) => this.getCardAspect(i)),
       zOffset: 0,
     };
   }
@@ -386,7 +381,13 @@ export default class Sketch {
       const toPaint = new Set();
       for (const entry of this.videoElements) {
         if (!entry.video || entry.video.readyState < 2) continue;
-        if (entry.playing) toPaint.add(entry.index);
+        if (
+          entry.playing ||
+          (this.currentScrollY < 40 && entry.index < this.cols) ||
+          this.filmReel.isSlotNearView(entry.index, VIDEO_VIEW_MARGIN)
+        ) {
+          toPaint.add(entry.index);
+        }
       }
       this.filmReel.updateVideoFrames(toPaint);
     }
@@ -804,7 +805,11 @@ export default class Sketch {
 
       settle();
 
-      if (this.isReady) this.updateVideoPlayback(performance.now());
+      this.filmReel?.paintSlot?.(index);
+      if (this.isReady) {
+        this.lastVideoCullAt = 0;
+        this.updateVideoPlayback(performance.now());
+      }
     };
 
     video.addEventListener("canplaythrough", onReady, { once: true });
@@ -837,7 +842,7 @@ export default class Sketch {
       });
   }
 
-  // Play nearest cards only. Blob source + no texture swap = no reload flicker.
+  // Play nearest in-view cards. Blob source + no texture swap = no reload flicker.
   updateVideoPlayback(now = performance.now()) {
     if (now - this.lastVideoCullAt < VIDEO_CULL_INTERVAL_MS) return;
     this.lastVideoCullAt = now;
@@ -845,6 +850,31 @@ export default class Sketch {
 
     const maxPlaying =
       this.cols === 1 ? MAX_PLAYING_MOBILE : MAX_PLAYING_DESKTOP;
+    const viewMargin = VIDEO_VIEW_MARGIN;
+    const { top, bottom } = this.filmReel
+      ? this.filmReel.getVisibleDepthRange()
+      : { top: 0, bottom: 0 };
+    // At scroll rest the first row sits high on the reel — rank from the top band,
+    // not the hang center (which otherwise prefers rows 03/04 over 01/02).
+    const anchorY =
+      this.currentScrollY < 40
+        ? top + (bottom - top) * 0.18
+        : (top + bottom) * 0.5;
+
+    const playing = new Set();
+
+    if (this.currentScrollY < 40) {
+      for (let col = 0; col < this.cols; col++) {
+        const entry = this.videoElements.find((e) => e.index === col);
+        if (!entry?.video || entry.video.readyState < 2) continue;
+        if (this.filmReel && !this.filmReel.isSlotNearView(col, viewMargin)) {
+          continue;
+        }
+        if (!entry.playing) entry.video.play().catch(() => {});
+        entry.playing = true;
+        playing.add(entry.index);
+      }
+    }
 
     const ranked = [];
     for (let i = 0; i < this.videoElements.length; i++) {
@@ -852,31 +882,32 @@ export default class Sketch {
       if (!entry.video) continue;
 
       const inBand = this.filmReel
-        ? this.filmReel.isSlotNearView(entry.index, VIDEO_VIEW_MARGIN * 0.5)
+        ? this.filmReel.isSlotNearView(entry.index, viewMargin)
         : true;
-      const { top, bottom } = this.filmReel
-        ? this.filmReel.getVisibleDepthRange()
-        : { top: 0, bottom: 0 };
       const slot = this.filmReel?.slots[entry.index];
       const mid = slot ? slot.y + slot.h * 0.5 : 0;
-      const center = (top + bottom) * 0.5;
-      ranked.push({ entry, inBand, dist: Math.abs(mid - center) });
+      ranked.push({ entry, inBand, dist: Math.abs(mid - anchorY) });
     }
 
     ranked.sort((a, b) => a.dist - b.dist);
 
-    let playingCount = 0;
+    let playingCount = playing.size;
     for (let i = 0; i < ranked.length; i++) {
       const { entry, inBand } = ranked[i];
+      if (playing.has(entry.index)) continue;
       const shouldPlay = inBand && playingCount < maxPlaying;
 
       if (shouldPlay) {
         playingCount += 1;
-        if (!entry.playing) {
-          entry.video.play().catch(() => {});
-          entry.playing = true;
-        }
-      } else if (entry.playing) {
+        if (!entry.playing) entry.video.play().catch(() => {});
+        entry.playing = true;
+        playing.add(entry.index);
+      }
+    }
+
+    for (const entry of this.videoElements) {
+      if (!entry.video || playing.has(entry.index)) continue;
+      if (entry.playing) {
         entry.video.pause();
         entry.playing = false;
       }
