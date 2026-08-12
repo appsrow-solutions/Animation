@@ -1,0 +1,148 @@
+[
+  {
+    "title": "Velour Atelier",
+    "description": "Perfume Cloud Shader Experience",
+    "link": "https://perfume-clouds-intro-react.vercel.app/cloud-shader-only.html",
+    "category": ["digital"],
+    "image": "perfume-clouds-intro-react.mp4",
+    "aspect": 1.2
+  },
+  {
+    "title": "WebGL Rain",
+    "description": "Interactive Rain Experience",
+    "link": "https://webgl-rain.vercel.app/",
+    "category": ["digital"],
+    "image": "webgl-rain.mp4",
+    "aspect": 1.2
+  },
+  {
+    "title": "Merchant Exporter",
+    "description": "Portfolio Website, Immersive Experience",
+    "link": "https://three-js-cfa25f.webflow.io/",
+    "category": ["digital"],
+    "image": "project1.mp4",
+    "aspect": 0.902
+  },
+  {
+    "title": "Poly",
+    "description": "Website Design",
+    "link": "https://background-rainboiw.webflow.io/",
+    "category": ["digital"],
+    "image": "project2.mp4",
+    "aspect": 1.202
+  },
+  {
+    "title": "OceanX",
+    "description": "A Year of Discovery",
+    "link": "https://cosmos-earth.webflow.io/",
+    "category": ["digital"],
+    "image": "project3.mp4",
+    "aspect": 1.402,
+    "zoom": 1.15
+  },
+  {
+    "title": "The Symphony Of Vines",
+    "description": "Interactive Cinematic Experience",
+    "link": "https://orb-particles.webflow.io/",
+    "category": ["digital", "motion"],
+    "image": "project4.mp4",
+    "aspect": 1.302,
+    "zoom": 1.15
+  },
+  {
+    "title": "Klook",
+    "description": "Interactive Quiz",
+    "link": "https://ascii-hero.webflow.io/",
+    "category": ["digital"],
+    "image": "project5.mp4",
+    "aspect": 1.102
+  },
+  {
+    "title": "RSPCA Animal Futures",
+    "description": "Interactive Learning Experience",
+    "link": "https://ascii-text.webflow.io/",
+    "category": ["digital"],
+    "image": "project6.mp4",
+    "aspect": 1.202
+  },
+  {
+    "title": "BlueYard",
+    "description": "Portfolio website",
+    "link": "https://water-text.webflow.io/",
+    "category": ["digital"],
+    "image": "project7.mp4",
+    "aspect": 1.233
+  },
+  {
+    "title": "Cosmos",
+    "description": "Marketing Website",
+    "link": "https://ocean-wave-c2b2e5.webflow.io/",
+    "category": ["digital"],
+    "image": "project8.mp4",
+    "aspect": 1.207
+  },
+  {
+    "title": "Merchant Exporter",
+    "description": "Portfolio Website, Immersive Experience",
+    "link": "https://appsrow-particles.webflow.io/",
+    "category": ["digital"],
+    "image": "project9.mp4",
+    "aspect": 0.902
+  },
+  {
+    "title": "Poly",
+    "description": "Website Design",
+    "link": "https://antigravity-ba4ff4.webflow.io/",
+    "category": ["digital"],
+    "image": "project10.mp4",
+    "aspect": 1.202
+  },
+  {
+    "title": "OceanX",
+    "description": "A Year of Discovery",
+    "link": "https://slider-infinite-1e8e52.webflow.io/",
+    "category": ["digital"],
+    "image": "project11.mp4",
+    "aspect": 1.402
+  },
+  {
+    "title": "The Symphony Of Vines",
+    "description": "Interactive Cinematic Experience",
+    "link": "https://particle-background-a3e85d.webflow.io/",
+    "category": ["digital", "motion"],
+    "image": "project12.mp4",
+    "aspect": 1.302
+  },
+  {
+    "title": "Klook",
+    "description": "Interactive Quiz",
+    "link": "https://shader-background-767ede86875898204dc31.webflow.io/",
+    "category": ["digital"],
+    "image": "project13.mp4",
+    "aspect": 1.102
+  },
+  {
+    "title": "RSPCA Animal Futures",
+    "description": "Interactive Learning Experience",
+    "link": "https://unicorn-shader.webflow.io/",
+    "category": ["digital"],
+    "image": "project14.mp4",
+    "aspect": 1.202
+  },
+  {
+    "title": "BlueYard",
+    "description": "Portfolio website",
+    "link": "https://water-shader.webflow.io/",
+    "category": ["digital"],
+    "image": "project15.mp4",
+    "aspect": 1.233
+  },
+  {
+    "title": "Orbital Image Scroll",
+    "description": "Image Drift Experience",
+    "link": "https://image-drift-gsap.vercel.app/",
+    "category": ["digital", "motion"],
+    "image": "image-drift-gsap.mp4",
+    "aspect": 1.2
+  }
+]
