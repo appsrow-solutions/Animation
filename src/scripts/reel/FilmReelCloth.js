@@ -390,26 +390,29 @@ export default class FilmReelCloth {
     const ctx = this.ctx;
     const sw = source.videoWidth || source.naturalWidth || source.width || 1;
     const sh = source.videoHeight || source.naturalHeight || source.height || 1;
-    const ir = (sw / sh) * REEL_MEDIA_ASPECT_CORRECTION;
-    const frameH = s.h / this.mediaHeightBoost;
-    const frameY = s.y + (s.h - frameH) * 0.5;
-    const sr = s.w / frameH;
-    let dx = s.x;
-    let dy = frameY;
-    let dw = s.w;
-    let dh = frameH;
+    const corr = REEL_MEDIA_ASPECT_CORRECTION;
+    const ir = (sw / sh) * corr;
+    const sr = s.w / s.h;
+    let sx;
+    let sy;
+    let cw;
+    let ch;
     if (ir > sr) {
-      dh = s.w / ir;
-      dy = frameY + (frameH - dh) * 0.5;
+      ch = sh;
+      cw = (ch * sr) / corr;
+      sx = (sw - cw) * 0.5;
+      sy = 0;
     } else {
-      dw = frameH * ir;
-      dx = s.x + (s.w - dw) * 0.5;
+      cw = sw;
+      ch = (cw / sr) * corr;
+      sx = 0;
+      sy = (sh - ch) * 0.5;
     }
 
     ctx.save();
     this.roundRect(ctx, s.x, s.y, s.w, s.h, 4);
     ctx.clip();
-    ctx.drawImage(source, dx, dy, dw, dh);
+    ctx.drawImage(source, sx, sy, cw, ch, s.x, s.y, s.w, s.h);
     ctx.restore();
 
     ctx.save();
@@ -424,8 +427,8 @@ export default class FilmReelCloth {
     const ctx = this.ctx;
     const m = Math.min(s.w, s.h);
     const xPad = m * 0.035;
-    const topPad = m * 0.022;
-    const bottomPad = m * 0.022;
+    const topPad = m * 0.03;
+    const bottomPad = m * 0.03;
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
     ctx.shadowBlur = m * 0.02;
