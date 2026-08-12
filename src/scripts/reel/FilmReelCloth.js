@@ -4,7 +4,7 @@ const CLOTH_COLOR = "#0c0c0c";
 const CLOTH_COLOR_DEEP = "#050505";
 const SPROCKET = "#ffffff";
 
-// Denser grid on the roll so the cylinder silhouette stays round
+// Default grid — overridden per device via clothCols/clothRows from app.js
 const COLS = 32;
 const ROWS = 60;
 const ROLL_ROW_SHARE = 0.58;
@@ -34,7 +34,6 @@ const SCROLL_END_CLEARANCE = 0.22;
 
 /**
  * Camera-film cloth (CPU sim, matching the HTML reel demo).
- * Restored pre-GPU version.
  */
 export default class FilmReelCloth {
   constructor(options = {}) {
@@ -47,6 +46,7 @@ export default class FilmReelCloth {
     this.slots = [];
     this.media = [];
     this._lastVideoPaint = 0;
+    this._normalFrame = 0;
 
     this.mesh = new THREE.Mesh();
     this.mesh.renderOrder = 1;
@@ -77,12 +77,20 @@ export default class FilmReelCloth {
       texW = null,
       maxAnisotropy = 4,
       mediaHeightBoost = 1,
+      clothCols = COLS,
+      clothRows = ROWS,
+      constraintIterations = CONSTRAINT_ITERATIONS,
+      videoPaintMax = VIDEO_PAINT_MAX,
     } = options;
 
     this.zOffset = zOffset;
     this.requestedTexW = texW;
     this.maxAnisotropy = maxAnisotropy;
     this.mediaHeightBoost = Math.max(1, mediaHeightBoost);
+    this.clothCols = clothCols;
+    this.clothRows = clothRows;
+    this.constraintIterations = constraintIterations;
+    this.videoPaintMax = videoPaintMax;
     this.gridCols = Math.max(1, gridCols);
     this.cardW = cardW;
     this.cardH = cardH;
@@ -127,6 +135,7 @@ export default class FilmReelCloth {
     this.windAmount = DEMO_WIND * sy;
     this.rollShrink = DEMO_ROLL_SHRINK * (this.rollRadius / DEMO_ROLL_R);
     this._lastVideoPaint = 0;
+    this._normalFrame = 0;
     this._idleCooldown = IDLE_COOLDOWN_FRAMES;
     this._lastScroll = 0;
 
@@ -171,12 +180,9 @@ export default class FilmReelCloth {
     this.buildTexture();
     this.paintAllSlots();
 
-    const material = new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshBasicMaterial({
       map: this.texture,
       side: THREE.DoubleSide,
-      roughness: 1.0,
-      metalness: 0.0,
-      envMapIntensity: 0,
     });
 
     this.mesh.geometry = this.geometry;
@@ -201,7 +207,7 @@ export default class FilmReelCloth {
   }
 
   restYForRow(y) {
-    const t = y / ROWS;
+    const t = y / this.clothRows;
     const hangShare = 1 - ROLL_ROW_SHARE;
     if (t <= hangShare) {
       const u = hangShare > 0 ? t / hangShare : 1;
@@ -213,11 +219,11 @@ export default class FilmReelCloth {
 
   buildParticles() {
     this.particles = [];
-    for (let y = 0; y <= ROWS; y++) {
+    for (let y = 0; y <= this.clothRows; y++) {
       const row = [];
       const restY = this.restYForRow(y);
-      for (let x = 0; x <= COLS; x++) {
-        const restX = (x / COLS - 0.5) * this.panelW;
+      for (let x = 0; x <= this.clothCols; x++) {
+        const restX = (x / this.clothCols - 0.5) * this.panelW;
         const pos = new THREE.Vector3(restX, restY, 0);
         row.push({
           pos: pos.clone(),
@@ -239,42 +245,46 @@ export default class FilmReelCloth {
     const addB = (a, b) =>
       this.bends.push({ a, b, rest: a.pos.distanceTo(b.pos) });
 
-    for (let y = 0; y <= ROWS; y++) {
-      for (let x = 0; x <= COLS; x++) {
+    for (let y = 0; y <= this.clothRows; y++) {
+      for (let x = 0; x <= this.clothCols; x++) {
         const p = this.particles[y][x];
-        if (x < COLS) addC(p, this.particles[y][x + 1]);
-        if (y < ROWS) addC(p, this.particles[y + 1][x]);
-        if (x < COLS && y < ROWS) {
+        if (x < this.clothCols) addC(p, this.particles[y][x + 1]);
+        if (y < this.clothRows) addC(p, this.particles[y + 1][x]);
+        if (x < this.clothCols && y < this.clothRows) {
           addC(p, this.particles[y + 1][x + 1]);
           addC(this.particles[y][x + 1], this.particles[y + 1][x]);
         }
-        if (x < COLS - 1) addB(p, this.particles[y][x + 2]);
-        if (y < ROWS - 1) addB(p, this.particles[y + 2][x]);
+        if (x < this.clothCols - 1) addB(p, this.particles[y][x + 2]);
+        if (y < this.clothRows - 1) addB(p, this.particles[y + 2][x]);
       }
     }
   }
 
   idx(x, y) {
-    return y * (COLS + 1) + x;
+    return y * (this.clothCols + 1) + x;
   }
 
   buildGeometry() {
-    const positions = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
-    const uvs = new Float32Array((COLS + 1) * (ROWS + 1) * 2);
+    const positions = new Float32Array(
+      (this.clothCols + 1) * (this.clothRows + 1) * 3
+    );
+    const uvs = new Float32Array(
+      (this.clothCols + 1) * (this.clothRows + 1) * 2
+    );
     const indices = [];
 
-    for (let y = 0; y <= ROWS; y++) {
-      for (let x = 0; x <= COLS; x++) {
+    for (let y = 0; y <= this.clothRows; y++) {
+      for (let x = 0; x <= this.clothCols; x++) {
         const i = this.idx(x, y);
-        uvs[i * 2] = x / COLS;
+        uvs[i * 2] = x / this.clothCols;
         uvs[i * 2 + 1] =
           (this.particles[y][x].restY - this.meshBottom) /
           (this.meshTop - this.meshBottom);
       }
     }
 
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
+    for (let y = 0; y < this.clothRows; y++) {
+      for (let x = 0; x < this.clothCols; x++) {
         const a = this.idx(x, y);
         const b = this.idx(x + 1, y);
         const c = this.idx(x, y + 1);
@@ -333,8 +343,8 @@ export default class FilmReelCloth {
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.wrapS = THREE.ClampToEdgeWrapping;
     this.texture.wrapT = THREE.ClampToEdgeWrapping;
-    this.texture.generateMipmaps = true;
-    this.texture.minFilter = THREE.LinearMipmapLinearFilter;
+    this.texture.generateMipmaps = false;
+    this.texture.minFilter = THREE.LinearFilter;
     this.texture.magFilter = THREE.LinearFilter;
     this.texture.anisotropy = this.maxAnisotropy;
     this.texture.needsUpdate = true;
@@ -430,9 +440,6 @@ export default class FilmReelCloth {
     const topPad = m * 0.03;
     const bottomPad = m * 0.03;
     ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-    ctx.shadowBlur = m * 0.02;
-    ctx.shadowOffsetY = m * 0.004;
     ctx.fillStyle = "#ffffff";
     ctx.font = `600 ${Math.round(m * 0.038)}px Arial, sans-serif`;
     ctx.textAlign = "left";
@@ -506,7 +513,6 @@ export default class FilmReelCloth {
     if (now - this._lastVideoPaint < VIDEO_PAINT_MS) return;
     this._lastVideoPaint = now;
 
-    // Only the nearest slots — painting the whole strip was a main-thread killer
     const { top, bottom } = this.getVisibleDepthRange();
     const center = (top + bottom) * 0.5;
     const ranked = [];
@@ -521,7 +527,7 @@ export default class FilmReelCloth {
     ranked.sort((a, b) => a.dist - b.dist);
 
     let dirty = false;
-    for (let n = 0; n < Math.min(VIDEO_PAINT_MAX, ranked.length); n++) {
+    for (let n = 0; n < Math.min(this.videoPaintMax, ranked.length); n++) {
       this.paintSlot(ranked[n].i, { chrome: true });
       dirty = true;
     }
@@ -542,14 +548,14 @@ export default class FilmReelCloth {
 
   syncUV() {
     const uvAttr = this.geometry.attributes.uv;
-    for (let y = 0; y <= ROWS; y++) {
-      for (let x = 0; x <= COLS; x++) {
+    for (let y = 0; y <= this.clothRows; y++) {
+      for (let x = 0; x <= this.clothCols; x++) {
         const p = this.particles[y][x];
         const along = p.restY - this.meshBottom;
         const belowSeam = this.hangH - along;
         const depth = this.rollMargin + this.scroll + belowSeam;
         const v = 1 - depth / this.contentH;
-        uvAttr.setXY(this.idx(x, y), x / COLS, v);
+        uvAttr.setXY(this.idx(x, y), x / this.clothCols, v);
       }
     }
     uvAttr.needsUpdate = true;
@@ -559,13 +565,13 @@ export default class FilmReelCloth {
     const R0 = this.rollRadius;
     const cy = this.seamY;
     const cz = R0;
-    const seamBand = ((this.meshTop - this.meshBottom) / ROWS) * 2.5;
+    const seamBand = ((this.meshTop - this.meshBottom) / this.clothRows) * 2.5;
 
-    for (let y = 0; y <= ROWS; y++) {
-      for (let x = 0; x <= COLS; x++) {
+    for (let y = 0; y <= this.clothRows; y++) {
+      for (let x = 0; x <= this.clothCols; x++) {
         const p = this.particles[y][x];
         const arc = p.restY - this.seamY;
-        const isSide = x === 0 || x === COLS;
+        const isSide = x === 0 || x === this.clothCols;
 
         if (arc >= 0) {
           const a = Math.min(arc, this.arcLen);
@@ -591,19 +597,20 @@ export default class FilmReelCloth {
 
   writeGeom() {
     const attr = this.geometry.attributes.position;
-    for (let y = 0; y <= ROWS; y++) {
-      for (let x = 0; x <= COLS; x++) {
+    for (let y = 0; y <= this.clothRows; y++) {
+      for (let x = 0; x <= this.clothCols; x++) {
         const p = this.particles[y][x];
         attr.setXYZ(this.idx(x, y), p.pos.x, p.pos.y, p.pos.z);
       }
     }
     attr.needsUpdate = true;
-    this.geometry.computeVertexNormals();
+    this._normalFrame = (this._normalFrame + 1) % 3;
+    if (this._normalFrame === 0) this.geometry.computeVertexNormals();
   }
 
   integrate(dt, t) {
-    for (let y = 0; y <= ROWS; y++) {
-      for (let x = 0; x <= COLS; x++) {
+    for (let y = 0; y <= this.clothRows; y++) {
+      for (let x = 0; x <= this.clothCols; x++) {
         const p = this.particles[y][x];
         if (p.pinned) continue;
 
@@ -620,15 +627,17 @@ export default class FilmReelCloth {
         p.pos.x += (p.restX - p.pos.x) * hold;
         p.pos.y += (p.restY - p.pos.y) * hold;
 
-        const nearSeam = Math.max(
-          0,
-          1 - (this.seamY - p.restY) / (this.hangH * 0.35)
-        );
-        const wind =
-          (Math.sin(t * 0.5 + x * 0.25 + y * 0.1) * this.windAmount +
-            Math.sin(t * 0.3 + y * 0.14) * this.windAmount * 0.5) *
-          (1 - nearSeam * 0.85);
-        p.pos.z += wind * dt * dt * 24;
+        if (this.poking) {
+          const nearSeam = Math.max(
+            0,
+            1 - (this.seamY - p.restY) / (this.hangH * 0.35)
+          );
+          const wind =
+            (Math.sin(t * 0.5 + x * 0.25 + y * 0.1) * this.windAmount +
+              Math.sin(t * 0.3 + y * 0.14) * this.windAmount * 0.5) *
+            (1 - nearSeam * 0.85);
+          p.pos.z += wind * dt * dt * 24;
+        }
 
         if (this.poking) {
           const d = Math.hypot(
@@ -647,7 +656,7 @@ export default class FilmReelCloth {
   }
 
   satisfy() {
-    for (let i = 0; i < CONSTRAINT_ITERATIONS; i++) {
+    for (let i = 0; i < this.constraintIterations; i++) {
       for (const c of this.constraints) {
         const dx = c.b.pos.x - c.a.pos.x;
         const dy = c.b.pos.y - c.a.pos.y;
@@ -754,7 +763,6 @@ export default class FilmReelCloth {
 
     if (Math.abs(this.scroll - prevScroll) > 1e-4) this.syncUV();
 
-    // Idle: skip particle solve (biggest CPU win). Keep last posed mesh.
     if (this._idleCooldown <= 0 && !this.poking && !scrollMoving) {
       return;
     }

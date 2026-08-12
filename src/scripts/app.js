@@ -11,11 +11,17 @@ const GAP_Y_MOBILE = 95;
 const COLS_DESKTOP = 2;
 const COLS_MOBILE = 1;
 const MOBILE_BREAKPOINT = 1024;
+const PHONE_BREAKPOINT = 768;
 const SEG = 36;
-const SEG_MOBILE = 24;
+const SEG_MOBILE = 20;
 const WORLD_PER_PIXEL = 4.2;
 const SCROLL_IDLE_MS = 180;
-const PIXEL_RATIO_CAP = 2;
+const PIXEL_RATIO_CAP = 1.75;
+const PIXEL_RATIO_CAP_MOBILE = 1.35;
+const PIXEL_RATIO_CAP_PHONE = 1.1;
+const REEL_PAD_X_DESKTOP = 140;
+const REEL_PAD_X_TABLET = 72;
+const REEL_PAD_X_PHONE = 44;
 const RECESS_DEPTH = 2400;
 const RECESS_DOWN_RATIO = 0.94;
 const RECESS_DOWN_RATIO_MOBILE = 0.52;
@@ -29,7 +35,7 @@ const ALPHA_FADE_FAR = CAMERA_Z * 2.45;
 const FOG_NEAR = CAMERA_Z * 0.95;
 const FOG_FAR = CAMERA_Z * 2.15;
 const CARD_SCALE = 0.81;
-const CARD_SCALE_MOBILE = 0.88;
+const CARD_SCALE_MOBILE = 0.92;
 const CARD_ASPECT = 1.58;
 const CARD_HEIGHT_BOOST = 1.21;
 const CORNER_RADIUS_UV = 0.08;
@@ -39,7 +45,7 @@ const VIDEO_CULL_INTERVAL_MS = 100;
 const MAX_PLAYING_DESKTOP = 2;
 const MAX_PLAYING_MOBILE = 1;
 const VIDEO_VIEW_MARGIN = 1.1;
-const REEL_PAD_X = 140;
+const VIDEO_LOAD_CONCURRENCY = 4;
 const REEL_ROLL_RADIUS = 0.11;
 
 // Webflow button-icon variant: arrow-up-right (↗)
@@ -74,28 +80,27 @@ export default class Sketch {
     this.scene.background = new THREE.Color(BG_COLOR);
 
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: window.innerWidth >= MOBILE_BREAKPOINT,
       powerPreference: "high-performance",
       stencil: false,
       depth: true,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, PIXEL_RATIO_CAP));
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio || 1, this.getPixelRatioCap())
+    );
     this.renderer.setSize(this.width, this.height);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.sortObjects = false;
     this.container.appendChild(this.renderer.domElement);
 
-    this.camera = new THREE.PerspectiveCamera(36, this.width / this.height, 1, 10000);
+    this.camera = new THREE.PerspectiveCamera(
+      this.isPhone() ? 40 : 36,
+      this.width / this.height,
+      1,
+      10000
+    );
     this.camera.position.set(0, 0, CAMERA_Z);
     this.camera.lookAt(0, 0, 0);
-
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.82));
-    const key = new THREE.DirectionalLight(0xffffff, 0.55);
-    key.position.set(0.5 * CAMERA_Z, 2.0 * CAMERA_Z, 2.6 * CAMERA_Z);
-    this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xffffff, 0.22);
-    rim.position.set(-1.5 * CAMERA_Z, 0.5 * CAMERA_Z, -2.0 * CAMERA_Z);
-    this.scene.add(rim);
 
     this.clock = new THREE.Clock();
     this.materials = [];
@@ -131,8 +136,14 @@ export default class Sketch {
 
     this.textureLoader = new THREE.TextureLoader();
     this.videoElements = [];
+    this._pendingVideoLoads = [];
+    this._activeVideoLoads = 0;
     this.lastVideoCullAt = 0;
     this.renderFrame = this.render.bind(this);
+    this._resizeTimer = 0;
+    this._lastLayoutWidth = 0;
+    this._lastLayoutHeight = 0;
+    this._hoverFrame = 0;
 
     this.targetScrollY = 0;
     this.currentScrollY = 0;
@@ -175,6 +186,39 @@ export default class Sketch {
     return window.innerWidth < MOBILE_BREAKPOINT ? COLS_MOBILE : COLS_DESKTOP;
   }
 
+  isMobile() {
+    return window.innerWidth < MOBILE_BREAKPOINT;
+  }
+
+  isPhone() {
+    return window.innerWidth < PHONE_BREAKPOINT;
+  }
+
+  isTouchDevice() {
+    return (
+      window.matchMedia("(pointer: coarse)").matches ||
+      "ontouchstart" in window
+    );
+  }
+
+  getPixelRatioCap() {
+    if (this.isPhone()) return PIXEL_RATIO_CAP_PHONE;
+    if (this.isMobile()) return PIXEL_RATIO_CAP_MOBILE;
+    return PIXEL_RATIO_CAP;
+  }
+
+  getReelPadX() {
+    if (this.isPhone()) return REEL_PAD_X_PHONE;
+    if (this.isMobile()) return REEL_PAD_X_TABLET;
+    return REEL_PAD_X_DESKTOP;
+  }
+
+  getReelViewLift() {
+    if (this.isPhone()) return 82;
+    if (this.isMobile()) return 98;
+    return REEL_VIEW_LIFT;
+  }
+
   getSegmentCount() {
     return this.cols === 1 ? SEG_MOBILE : SEG;
   }
@@ -207,7 +251,8 @@ export default class Sketch {
   getCardWidth() {
     const visibleW = this.getVisibleWidth();
     const gaps = this.getGapX() * Math.max(0, this.cols - 1);
-    return ((visibleW * 0.96 - gaps) / this.cols) * this.getCardScale();
+    const widthBias = this.isPhone() ? 0.9 : this.isMobile() ? 0.94 : 0.96;
+    return ((visibleW * widthBias - gaps) / this.cols) * this.getCardScale();
   }
 
   getCardAspect(index) {
@@ -257,10 +302,12 @@ export default class Sketch {
 
   getReelTextureWidth(panelW, cardW) {
     const cardScreenW = (cardW / this.getVisibleWidth()) * this.width;
-    const dpr = Math.min(window.devicePixelRatio || 1, PIXEL_RATIO_CAP);
-    const slotPx = Math.round(cardScreenW * dpr * 1.08);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.getPixelRatioCap());
+    const slotPx = Math.round(cardScreenW * dpr * 1.04);
     const minTexW = Math.round((panelW / cardW) * slotPx);
-    return Math.min(2048, Math.max(1280, minTexW));
+    const maxTex = this.isPhone() ? 768 : this.isMobile() ? 1024 : 1600;
+    const minTex = this.isPhone() ? 640 : 768;
+    return Math.min(maxTex, Math.max(minTex, minTexW));
   }
 
   getReelBounds() {
@@ -268,8 +315,7 @@ export default class Sketch {
     const cardH = cardW / CARD_ASPECT;
     const gapX = this.getGapX();
     const gapY = this.getGapY();
-    const pad = REEL_PAD_X;
-    // Less top void so the first row sits closer under the roll
+    const pad = this.getReelPadX();
     const cardDrop = cardH * 0.14;
     const hangHeight = cardDrop + cardH * 2 + gapY + cardH * 0.04;
     const width = this.cols * cardW + Math.max(0, this.cols - 1) * gapX + pad * 2;
@@ -279,8 +325,15 @@ export default class Sketch {
       hangHeight,
       rollRadius: cardH * REEL_ROLL_RADIUS,
       texW: this.getReelTextureWidth(width, cardW),
-      maxAnisotropy: this.renderer.capabilities.getMaxAnisotropy(),
+      maxAnisotropy: Math.min(
+        2,
+        this.renderer.capabilities.getMaxAnisotropy()
+      ),
       mediaHeightBoost: 1,
+      clothCols: this.isPhone() ? 18 : this.isMobile() ? 22 : 26,
+      clothRows: this.isPhone() ? 34 : this.isMobile() ? 40 : 48,
+      constraintIterations: this.isPhone() ? 2 : this.isMobile() ? 2 : 3,
+      videoPaintMax: this.isMobile() ? 1 : 2,
       gridCols: this.cols,
       cardW,
       cardH,
@@ -324,7 +377,7 @@ export default class Sketch {
     if (!this.filmReel) return;
     const parentY = this.contentGroup.position.y;
     const foldY =
-      (this.foldLine.start + this.foldLine.end) * 0.5 + REEL_VIEW_LIFT;
+      (this.foldLine.start + this.foldLine.end) * 0.5 + this.getReelViewLift();
     this.filmReel.syncWorldSeam(foldY, parentY);
     this.filmReel.setScrollTarget(this.currentScrollY);
     if (dt > 0) {
@@ -429,8 +482,10 @@ export default class Sketch {
       this.targetScrollY = 0;
       this.currentScrollY = 0;
 
-      // Start only the cards near the camera — rest stay loaded & paused in memory
+      // Paint every loaded slot once, then play only nearest cards
       this.lastVideoCullAt = 0;
+      this.repaintReelMedia();
+      this.filmReel?.paintAllReadyVideos();
       this.updateVideoPlayback(performance.now());
       this.updateFilmScrollbar();
     });
@@ -438,7 +493,10 @@ export default class Sketch {
 
   updateContentOffset() {
     if (this.cols === 1) {
-      const safeMargin = Math.max(180, this.cardHeight * 0.18);
+      const safeMargin = Math.max(
+        this.isPhone() ? 96 : this.isMobile() ? 128 : 180,
+        this.cardHeight * (this.isPhone() ? 0.11 : 0.16)
+      );
       this.baseYOffset =
         this.foldLine.start - safeMargin - this.cardHeight * 0.5;
     } else {
@@ -463,8 +521,12 @@ export default class Sketch {
       // Keep fold lower so scrolled cards don't sit tight under the heading
       const visibleH = this.getVisibleHeight();
       const visibleHalf = visibleH * 0.5;
-      const foldRange = Math.max(140, this.cardHeight * 0.18);
-      const foldCenter = visibleHalf - visibleH * 0.14;
+      const foldRange = Math.max(
+        this.isPhone() ? 96 : 140,
+        this.cardHeight * (this.isPhone() ? 0.13 : 0.18)
+      );
+      const foldCenter =
+        visibleHalf - visibleH * (this.isPhone() ? 0.08 : 0.14);
       this.foldLine.start = foldCenter - foldRange * 0.55;
       this.foldLine.end = foldCenter + foldRange * 0.45;
       return;
@@ -656,6 +718,25 @@ export default class Sketch {
   }
 
   loadCardVideo(url, material) {
+    this._pendingVideoLoads.push({ url, material });
+    this._drainVideoLoadQueue();
+  }
+
+  _drainVideoLoadQueue() {
+    while (
+      this._activeVideoLoads < VIDEO_LOAD_CONCURRENCY &&
+      this._pendingVideoLoads.length > 0
+    ) {
+      const job = this._pendingVideoLoads.shift();
+      this._activeVideoLoads += 1;
+      this._startCardVideoLoad(job.url, job.material, () => {
+        this._activeVideoLoads -= 1;
+        this._drainVideoLoadQueue();
+      });
+    }
+  }
+
+  _startCardVideoLoad(url, material, onJobDone) {
     const video = document.createElement("video");
     video.loop = true;
     video.muted = true;
@@ -682,11 +763,13 @@ export default class Sketch {
     const settle = () => {
       if (settled) return;
       settled = true;
+      onJobDone();
       this.markAssetLoaded();
     };
 
     const onReady = () => {
       if (material.userData.mediaReady) return;
+      if (video.readyState < 2) return;
       material.userData.mediaReady = true;
 
       const vw = video.videoWidth || 1;
@@ -710,17 +793,15 @@ export default class Sketch {
       material.userData.overlayTexture = overlay;
 
       this.filmReel?.setSlotVideo(index, video);
-      this.filmReel?.paintAllReadyVideos?.();
       this.applyMediaAspect(index, aspect, material);
 
       // Seek one frame so the paused card isn't blank, then let cull decide play
-      if (video.readyState >= 2) {
-        try {
-          video.currentTime = Math.min(0.05, (video.duration || 1) * 0.01);
-        } catch {
-          /* ignore seek errors before metadata */
-        }
+      try {
+        video.currentTime = Math.min(0.05, (video.duration || 1) * 0.01);
+      } catch {
+        /* ignore seek errors before metadata */
       }
+
       settle();
 
       if (this.isReady) this.updateVideoPlayback(performance.now());
@@ -739,8 +820,6 @@ export default class Sketch {
       settle();
     });
 
-    // Fetch once into a blob during the loader. Pause/play later never re-downloads.
-    video.preload = "auto";
     fetch(url)
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -953,7 +1032,9 @@ export default class Sketch {
 
     const newWidth = this.getCardWidth();
     const colsChanged = nextCols !== prevCols;
-    if (!force && !colsChanged && Math.abs(newWidth - this.cardWidth) < 2) return;
+    const widthDelta = Math.abs(newWidth - this.cardWidth);
+    const widthThreshold = this.isPhone() ? 0.5 : this.isMobile() ? 1 : 2;
+    if (!force && !colsChanged && widthDelta < widthThreshold) return;
 
     this.cardWidth = newWidth;
     this.refreshReferenceHeight();
@@ -990,17 +1071,24 @@ export default class Sketch {
   }
 
   setupResize() {
-    this.handleResize = this.resize.bind(this);
+    this.handleResize = () => {
+      window.clearTimeout(this._resizeTimer);
+      this._resizeTimer = window.setTimeout(() => this.resize(), 100);
+    };
     window.addEventListener("resize", this.handleResize);
+    window.addEventListener("orientationchange", this.handleResize);
+    window.visualViewport?.addEventListener("resize", this.handleResize);
+    window.visualViewport?.addEventListener("scroll", this.handleResize);
   }
 
   setupScroll() {
+    const touch = this.isTouchDevice();
     this.lenis = new Lenis({
-      duration: 1.4,
+      duration: touch ? 1.15 : 1.4,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
-      syncTouch: false,
-      touchMultiplier: 1.4,
+      syncTouch: touch,
+      touchMultiplier: this.isPhone() ? 1.65 : 1.35,
       wheelMultiplier: 0.85,
       autoRaf: false,
     });
@@ -1025,7 +1113,7 @@ export default class Sketch {
 
   updateFilmScrollbar() {
     if (!this.filmScrollbarIndicator || !this.filmScrollbarTrack) return;
-    if (!this.isReady) return;
+    if (!this.isReady || this.isMobile()) return;
 
     const ratio = this.getFilmScrollbarRatio();
 
@@ -1227,6 +1315,10 @@ export default class Sketch {
       return;
     }
 
+    this._hoverFrame = (this._hoverFrame + 1) % 2;
+    const pokeEveryFrame = this.scrolling || this.filmReel.poking;
+    if (!pokeEveryFrame && this._hoverFrame !== 0 && !this.hoverDirty) return;
+
     this.raycaster.setFromCamera(this.hoverPointer, this.camera);
 
     // Prefer plane poke like the HTML demo (stable coords, no mesh-hit jitter)
@@ -1256,13 +1348,22 @@ export default class Sketch {
   resize() {
     this.width = this.container.offsetWidth;
     this.height = this.container.offsetHeight;
+    const nextCols = this.getCols();
+    const layoutChanged =
+      nextCols !== this.cols ||
+      Math.abs(this.width - this._lastLayoutWidth) > 1 ||
+      Math.abs(this.height - this._lastLayoutHeight) > 1;
+    this._lastLayoutWidth = this.width;
+    this._lastLayoutHeight = this.height;
+
     this.renderer.setPixelRatio(
-      Math.min(window.devicePixelRatio || 1, PIXEL_RATIO_CAP)
+      Math.min(window.devicePixelRatio || 1, this.getPixelRatioCap())
     );
     this.renderer.setSize(this.width, this.height);
     this.camera.aspect = this.width / this.height;
+    this.camera.fov = this.isPhone() ? 40 : 36;
     this.camera.updateProjectionMatrix();
-    this.layoutCards();
+    this.layoutCards(layoutChanged);
     this.updateFoldLine();
     this.updateContentOffset();
     this.ensureFilmReel();
@@ -1275,14 +1376,10 @@ export default class Sketch {
     this.contentGroup.position.y = this.baseYOffset;
     this.scrolling = this.isReady && now - this.lastScrollAt < SCROLL_IDLE_MS;
 
-    for (let i = 0; i < this.materials.length; i++) {
-      this.materials[i].uniforms.u_time.value = time;
-    }
-
-    // Poke must be current before cloth integrate
+    // Cards are invisible — reel cloth carries visuals; skip shader uniform churn.
     this.updateHover();
     this.syncFilmReel(dt);
-    this.updateFilmScrollbar();
+    if (!this.isMobile()) this.updateFilmScrollbar();
 
     if (!this.isReady) return;
     this.updateVideoPlayback(now);
@@ -1303,7 +1400,13 @@ export default class Sketch {
 
   destroy() {
     this.isPlaying = false;
-    if (this.handleResize) window.removeEventListener("resize", this.handleResize);
+    if (this.handleResize) {
+      window.removeEventListener("resize", this.handleResize);
+      window.removeEventListener("orientationchange", this.handleResize);
+      window.visualViewport?.removeEventListener("resize", this.handleResize);
+      window.visualViewport?.removeEventListener("scroll", this.handleResize);
+    }
+    window.clearTimeout(this._resizeTimer);
     this.lenis?.destroy?.();
     this.lenis = null;
     const canvas = this.renderer.domElement;

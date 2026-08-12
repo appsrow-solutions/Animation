@@ -7,6 +7,13 @@
 html,
 body {
   background: #f0f0ee;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overscroll-behavior-y: none;
+  touch-action: pan-y;
 }
 
 /* Hide native scrollbar — custom film strip on the right */
@@ -98,8 +105,8 @@ canvas {
 
 .site-logo {
   position: fixed;
-  top: clamp(1.25rem, 3vh, 2.25rem);
-  left: clamp(1.25rem, 3vw, 2.5rem);
+  top: max(clamp(1.25rem, 3vh, 2.25rem), env(safe-area-inset-top, 0px));
+  left: max(clamp(1.25rem, 3vw, 2.5rem), env(safe-area-inset-left, 0px));
   z-index: 3;
   display: block;
   line-height: 0;
@@ -123,8 +130,8 @@ html.is-ready .site-logo {
 
 .site-cta {
   position: fixed;
-  top: clamp(1.25rem, 3vh, 2.25rem);
-  right: clamp(1.25rem, 3vw, 2.5rem);
+  top: max(clamp(1.25rem, 3vh, 2.25rem), env(safe-area-inset-top, 0px));
+  right: max(clamp(1.25rem, 3vw, 2.5rem), env(safe-area-inset-right, 0px));
   z-index: 3;
   display: inline-flex;
   align-items: center;
@@ -163,8 +170,8 @@ html.is-ready .site-cta {
 
 .site-credit {
   position: fixed;
-  bottom: clamp(1.25rem, 3vh, 2.25rem);
-  right: clamp(1.25rem, 3vw, 2.5rem);
+  bottom: max(clamp(1.25rem, 3vh, 2.25rem), env(safe-area-inset-bottom, 0px));
+  right: max(clamp(1.25rem, 3vw, 2.5rem), env(safe-area-inset-right, 0px));
   z-index: 3;
   font-family: Georgia, serif;
   font-size: 0.75rem;
@@ -223,9 +230,13 @@ html.is-ready .section-heading {
 }
 
 @media (max-width: 1023px) {
+  .film-scrollbar {
+    display: none !important;
+  }
+
   .site-logo {
-    top: 1rem;
-    left: 1rem;
+    top: max(0.85rem, env(safe-area-inset-top, 0px));
+    left: max(0.85rem, env(safe-area-inset-left, 0px));
   }
 
   .site-logo img {
@@ -233,8 +244,8 @@ html.is-ready .section-heading {
   }
 
   .site-cta {
-    top: 1rem;
-    right: 1rem;
+    top: max(0.85rem, env(safe-area-inset-top, 0px));
+    right: max(0.85rem, env(safe-area-inset-right, 0px));
     padding: 0.5em 0.75em;
     font-size: 0.62rem;
     letter-spacing: 0.06em;
@@ -253,6 +264,10 @@ html.is-ready .section-heading {
 }
 
 @media (max-width: 600px) {
+  .site-credit {
+    display: none;
+  }
+
   .site-cta {
     padding: 0.45em 0.65em;
     font-size: 0.58rem;
@@ -272,7 +287,9 @@ html.is-ready .section-heading {
   top: 0;
   left: 0;
   width: 100vw;
+  width: 100dvw;
   height: 100vh;
+  height: 100dvh;
   z-index: 1;
   opacity: 0;
   transition: opacity 0.55s ease;
@@ -286,6 +303,7 @@ html.is-ready #container {
   position: relative;
   z-index: 0;
   height: 100vh;
+  height: 100dvh;
 }
 
 .loader {
