@@ -31,7 +31,6 @@ const DEMO_MAX_Z = 0.16;
 const DEMO_GRAVITY = 0.12;
 const DEMO_WIND = 0.011;
 const DEMO_ROLL_SHRINK = 0.012;
-const SCROLL_END_CLEARANCE = 0.22;
 
 /**
  * Camera-film cloth (CPU sim, matching the HTML reel demo).
@@ -82,6 +81,8 @@ export default class FilmReelCloth {
       clothRows = ROWS,
       constraintIterations = CONSTRAINT_ITERATIONS,
       slotAspects = [],
+      endPad = 0,
+      visibleHangH = null,
     } = options;
 
     this.zOffset = zOffset;
@@ -109,6 +110,8 @@ export default class FilmReelCloth {
       this.gridCols * cardW + (this.gridCols - 1) * gapX + pad * 2
     );
     this.hangH = Math.max(hangHeight, cardH * 2 + gapY + cardDrop * 0.5);
+    this.visibleHangH =
+      visibleHangH > 0 ? visibleHangH : this.hangH;
     this.rollRadius = rollRadius ?? this.hangH * 0.028;
     this.rollArc = Math.PI * 1.55;
     this.arcLen = this.rollRadius * this.rollArc;
@@ -120,18 +123,12 @@ export default class FilmReelCloth {
 
     this.cardsH = this.computeCardsH();
     this.rollMargin = this.arcLen + 0.1 * (this.hangH / DEMO_HANG_H);
-    this.bottomBreath = this.cardH * 0.02;
+    this.bottomBreath = Math.max(endPad, this.cardH * 0.04);
     this.contentH =
       this.rollMargin + this.cardDrop + this.cardsH + this.bottomBreath;
 
     this.buildSlots();
-
-    const lastSlot = this.slots[this.slots.length - 1];
-    const lastSlotBottom = lastSlot
-      ? lastSlot.y + lastSlot.h
-      : this.rollMargin + this.cardDrop;
-    const endClearance = this.bottomBreath + this.cardH * SCROLL_END_CLEARANCE;
-    this.maxScroll = Math.max(0, lastSlotBottom - this.hangH + endClearance);
+    this.refreshMaxScroll();
 
     const sx = this.panelW / DEMO_PANEL_W;
     const sy = this.hangH / DEMO_HANG_H;
@@ -210,6 +207,20 @@ export default class FilmReelCloth {
       next.push(this.media[i] || { type: "none", source: null, dirty: true });
     }
     this.media = next;
+  }
+
+  refreshMaxScroll() {
+    const lastSlot = this.slots[this.slots.length - 1];
+    const lastH = lastSlot ? lastSlot.h : this.cardH;
+    const lastSlotBottom = lastSlot
+      ? lastSlot.y + lastSlot.h
+      : this.rollMargin + this.cardDrop;
+    const visibleHang = this.visibleHangH > 0 ? this.visibleHangH : this.hangH;
+    // Lift the last card fully into the on-screen hang, then leave ~90px of film.
+    this.maxScroll = Math.max(
+      0,
+      lastSlotBottom + this.bottomBreath + lastH * 0.4 - this.rollMargin - visibleHang
+    );
   }
 
   rebuild(options = {}) {
@@ -464,13 +475,7 @@ export default class FilmReelCloth {
     this.contentH =
       this.rollMargin + this.cardDrop + this.cardsH + this.bottomBreath;
     this.buildSlots();
-
-    const lastSlot = this.slots[this.slots.length - 1];
-    const lastSlotBottom = lastSlot
-      ? lastSlot.y + lastSlot.h
-      : this.rollMargin + this.cardDrop;
-    const endClearance = this.bottomBreath + this.cardH * SCROLL_END_CLEARANCE;
-    this.maxScroll = Math.max(0, lastSlotBottom - this.hangH + endClearance);
+    this.refreshMaxScroll();
 
     if (Math.abs(this.contentH - prevContentH) > 1) {
       this.buildTexture();
@@ -510,20 +515,26 @@ export default class FilmReelCloth {
     const xPad = m * 0.035;
     const topPad = m * 0.03;
     const bottomPad = m * 0.03;
+    const label = String(i + 1).padStart(2, "0");
+    const fontSize = Math.max(13, Math.round(m * 0.04));
+
     ctx.save();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `600 ${Math.round(m * 0.038)}px Arial, sans-serif`;
+    ctx.font = `700 ${fontSize}px Arial, sans-serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(
-      String(i + 1).padStart(2, "0"),
-      s.x + xPad,
-      s.y + topPad
-    );
+    // Clean number — stroke only for contrast, no blur badge
+    ctx.lineWidth = Math.max(2.5, fontSize * 0.16);
+    ctx.strokeStyle = "rgba(0,0,0,0.72)";
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeText(label, s.x + xPad, s.y + topPad);
+    ctx.fillText(label, s.x + xPad, s.y + topPad);
 
-    ctx.font = `500 ${Math.round(m * 0.065)}px Arial, "Segoe UI Symbol", sans-serif`;
+    const arrowSize = Math.max(14, Math.round(m * 0.06));
+    ctx.font = `600 ${arrowSize}px Arial, "Segoe UI Symbol", sans-serif`;
     ctx.textAlign = "right";
     ctx.textBaseline = "bottom";
+    ctx.lineWidth = Math.max(2, arrowSize * 0.12);
+    ctx.strokeText("↗", s.x + s.w - xPad, s.y + s.h - bottomPad);
     ctx.fillText("↗", s.x + s.w - xPad, s.y + s.h - bottomPad);
     ctx.restore();
   }

@@ -20,8 +20,8 @@ const PIXEL_RATIO_CAP = 1.75;
 const PIXEL_RATIO_CAP_MOBILE = 1.35;
 const PIXEL_RATIO_CAP_PHONE = 1.1;
 const REEL_PAD_X_DESKTOP = 140;
-const REEL_PAD_X_TABLET = 72;
-const REEL_PAD_X_PHONE = 44;
+const REEL_PAD_X_TABLET = 56;
+const REEL_PAD_X_PHONE = 22;
 const RECESS_DEPTH = 2400;
 const RECESS_DOWN_RATIO = 0.94;
 const RECESS_DOWN_RATIO_MOBILE = 0.52;
@@ -56,6 +56,7 @@ const START_Y_OFFSET = -40;
 // Lift the film reel under the heading (world units) — modest, not too high
 const REEL_VIEW_LIFT = 115;
 const SCROLL_END_BOTTOM_CLEARANCE = 0.1;
+const SCROLL_END_PAD_PX = 100;
 
 
 export default class Sketch {
@@ -92,7 +93,7 @@ export default class Sketch {
     this.container.appendChild(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(
-      this.isPhone() ? 40 : 36,
+      36,
       this.width / this.height,
       1,
       10000
@@ -212,9 +213,14 @@ export default class Sketch {
   }
 
   getReelViewLift() {
-    if (this.isPhone()) return 82;
-    if (this.isMobile()) return 98;
+    if (this.isPhone()) return 48;
+    if (this.isMobile()) return -36;
     return REEL_VIEW_LIFT;
+  }
+
+  getRollRadius(cardH) {
+    const scale = this.isPhone() ? 0.35 : this.isMobile() ? 0.72 : 1;
+    return cardH * REEL_ROLL_RADIUS * scale;
   }
 
   getSegmentCount() {
@@ -249,7 +255,15 @@ export default class Sketch {
   getCardWidth() {
     const visibleW = this.getVisibleWidth();
     const gaps = this.getGapX() * Math.max(0, this.cols - 1);
-    const widthBias = this.isPhone() ? 0.9 : this.isMobile() ? 0.94 : 0.96;
+    const padX = this.getReelPadX() * 2;
+
+    // 1-col phone: 95% width so sprocket edges stay visible
+    if (this.cols === 1) {
+      const fill = this.isPhone() ? 0.95 : 0.94;
+      return Math.max(160, visibleW * fill - padX);
+    }
+
+    const widthBias = 0.96;
     return ((visibleW * widthBias - gaps) / this.cols) * this.getCardScale();
   }
 
@@ -308,14 +322,31 @@ export default class Sketch {
     const gapX = this.getGapX();
     const gapY = this.getGapY();
     const pad = this.getReelPadX();
-    const cardDrop = cardH * 0.14;
-    const hangHeight = cardDrop + cardH * 2 + gapY + cardH * 0.04;
+    const cardDrop = cardH * (this.isPhone() ? 0.06 : 0.14);
+    let hangHeight = cardDrop + cardH * 2 + gapY + cardH * 0.04;
+    if (this.isPhone()) {
+      // Extend past the bottom of the screen so the roll edge is never visible
+      hangHeight = Math.max(hangHeight, this.getVisibleHeight() * 0.95);
+    } else if (this.isMobile()) {
+      hangHeight = Math.max(hangHeight, this.getVisibleHeight() * 0.52);
+    }
     const width = this.cols * cardW + Math.max(0, this.cols - 1) * gapX + pad * 2;
+    const clothHang = Math.max(
+      hangHeight,
+      cardH * 2 + gapY + cardDrop * 0.5
+    );
+    const visH = this.getVisibleHeight();
+    const foldY =
+      (this.foldLine.start + this.foldLine.end) * 0.5 + this.getReelViewLift();
+    const meshBottom = foldY - clothHang;
+    const visibleBottom = Math.max(meshBottom, -visH * 0.5);
+    const visibleHangH = Math.max(clothHang * 0.4, foldY - visibleBottom);
 
     return {
       width,
       hangHeight,
-      rollRadius: cardH * REEL_ROLL_RADIUS,
+      visibleHangH,
+      rollRadius: this.getRollRadius(cardH),
       texW: this.getReelTextureWidth(width, cardW),
       maxAnisotropy: Math.min(
         2,
@@ -334,6 +365,8 @@ export default class Sketch {
       cardDrop,
       cardCount: projects.length,
       slotAspects: projects.map((_, i) => this.getCardAspect(i)),
+      endPad:
+        (SCROLL_END_PAD_PX / Math.max(this.height, 1)) * this.getVisibleHeight(),
       zOffset: 0,
     };
   }
@@ -484,12 +517,9 @@ export default class Sketch {
 
   updateContentOffset() {
     if (this.cols === 1) {
-      const safeMargin = Math.max(
-        this.isPhone() ? 96 : this.isMobile() ? 128 : 180,
-        this.cardHeight * (this.isPhone() ? 0.11 : 0.16)
-      );
-      this.baseYOffset =
-        this.foldLine.start - safeMargin - this.cardHeight * 0.5;
+      // Film reel is positioned by fold + view lift — keep group origin neutral
+      // so the title area stays clear of the black strip.
+      this.baseYOffset = this.isPhone() ? 0 : START_Y_OFFSET * 0.35;
     } else {
       this.baseYOffset = START_Y_OFFSET;
     }
@@ -517,7 +547,7 @@ export default class Sketch {
         this.cardHeight * (this.isPhone() ? 0.13 : 0.18)
       );
       const foldCenter =
-        visibleHalf - visibleH * (this.isPhone() ? 0.08 : 0.14);
+        visibleHalf - visibleH * (this.isPhone() ? 0.14 : 0.24);
       this.foldLine.start = foldCenter - foldRange * 0.55;
       this.foldLine.end = foldCenter + foldRange * 0.45;
       return;
@@ -1346,7 +1376,7 @@ export default class Sketch {
     );
     this.renderer.setSize(this.width, this.height);
     this.camera.aspect = this.width / this.height;
-    this.camera.fov = this.isPhone() ? 40 : 36;
+    this.camera.fov = 36;
     this.camera.updateProjectionMatrix();
     this.layoutCards(layoutChanged);
     this.updateFoldLine();
@@ -1365,6 +1395,12 @@ export default class Sketch {
     this.updateHover();
     this.syncFilmReel(dt);
     if (!this.isMobile()) this.updateFilmScrollbar();
+
+    const reelMax = this.filmReel?.maxScroll;
+    if (reelMax != null && reelMax !== this._lastReelMaxScroll) {
+      this._lastReelMaxScroll = reelMax;
+      this.updateScrollSpacer();
+    }
 
     if (!this.isReady) return;
     this.updateVideoPlayback(now);
