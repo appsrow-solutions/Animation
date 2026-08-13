@@ -17,8 +17,8 @@ const SEG_MOBILE = 20;
 const WORLD_PER_PIXEL = 4.2;
 const SCROLL_IDLE_MS = 180;
 const PIXEL_RATIO_CAP = 1.75;
-const PIXEL_RATIO_CAP_MOBILE = 1.35;
-const PIXEL_RATIO_CAP_PHONE = 1.1;
+const PIXEL_RATIO_CAP_MOBILE = 1.75;
+const PIXEL_RATIO_CAP_PHONE = 2;
 const REEL_PAD_X_DESKTOP = 140;
 const REEL_PAD_X_TABLET = 56;
 const REEL_PAD_X_PHONE = 22;
@@ -213,13 +213,19 @@ export default class Sketch {
   }
 
   getReelViewLift() {
-    if (this.isPhone()) return 48;
+    if (this.isPhone()) return 0;
     if (this.isMobile()) return -36;
     return REEL_VIEW_LIFT;
   }
 
+  // World-space gap from the top of the screen to the roll (keeps title clear on short phones)
+  getPhoneTitleClearance() {
+    const px = Math.max(96, Math.min(128, this.height * 0.16));
+    return (px / Math.max(this.height, 1)) * this.getVisibleHeight();
+  }
+
   getRollRadius(cardH) {
-    const scale = this.isPhone() ? 0.35 : this.isMobile() ? 0.72 : 1;
+    const scale = this.isPhone() ? 1.15 : this.isMobile() ? 0.85 : 1;
     return cardH * REEL_ROLL_RADIUS * scale;
   }
 
@@ -309,10 +315,10 @@ export default class Sketch {
   getReelTextureWidth(panelW, cardW) {
     const cardScreenW = (cardW / this.getVisibleWidth()) * this.width;
     const dpr = Math.min(window.devicePixelRatio || 1, this.getPixelRatioCap());
-    const slotPx = Math.round(cardScreenW * dpr * 1.04);
+    const slotPx = Math.round(cardScreenW * dpr * 1.35);
     const minTexW = Math.round((panelW / cardW) * slotPx);
-    const maxTex = this.isPhone() ? 768 : this.isMobile() ? 1024 : 1600;
-    const minTex = this.isPhone() ? 640 : 768;
+    const maxTex = this.isPhone() ? 1536 : this.isMobile() ? 1400 : 1600;
+    const minTex = this.isPhone() ? 1024 : 768;
     return Math.min(maxTex, Math.max(minTex, minTexW));
   }
 
@@ -322,11 +328,11 @@ export default class Sketch {
     const gapX = this.getGapX();
     const gapY = this.getGapY();
     const pad = this.getReelPadX();
-    const cardDrop = cardH * (this.isPhone() ? 0.06 : 0.14);
+    const cardDrop = cardH * (this.isPhone() ? 0.04 : 0.14);
     let hangHeight = cardDrop + cardH * 2 + gapY + cardH * 0.04;
     if (this.isPhone()) {
-      // Extend past the bottom of the screen so the roll edge is never visible
-      hangHeight = Math.max(hangHeight, this.getVisibleHeight() * 0.95);
+      // Tall hang: fill from below the title to past the bottom of the screen
+      hangHeight = Math.max(hangHeight, this.getVisibleHeight() * 1.08);
     } else if (this.isMobile()) {
       hangHeight = Math.max(hangHeight, this.getVisibleHeight() * 0.52);
     }
@@ -349,9 +355,10 @@ export default class Sketch {
       rollRadius: this.getRollRadius(cardH),
       texW: this.getReelTextureWidth(width, cardW),
       maxAnisotropy: Math.min(
-        2,
+        8,
         this.renderer.capabilities.getMaxAnisotropy()
       ),
+      maxTexH: Math.min(8192, this.renderer.capabilities.maxTextureSize || 4096),
       mediaHeightBoost: 1,
       clothCols: this.isPhone() ? 18 : this.isMobile() ? 22 : 26,
       clothRows: this.isPhone() ? 34 : this.isMobile() ? 40 : 48,
@@ -546,8 +553,9 @@ export default class Sketch {
         this.isPhone() ? 96 : 140,
         this.cardHeight * (this.isPhone() ? 0.13 : 0.18)
       );
-      const foldCenter =
-        visibleHalf - visibleH * (this.isPhone() ? 0.14 : 0.24);
+      const foldCenter = this.isPhone()
+        ? visibleHalf - this.getPhoneTitleClearance()
+        : visibleHalf - visibleH * 0.24;
       this.foldLine.start = foldCenter - foldRange * 0.55;
       this.foldLine.end = foldCenter + foldRange * 0.45;
       return;

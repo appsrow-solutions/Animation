@@ -284,8 +284,8 @@ html.is-ready .section-heading {
   }
 
   .section-heading {
-    top: 2.35rem;
-    padding: 0 0.35rem;
+    top: 2.15rem;
+    padding: 0 0.35rem 0.35rem;
     width: min(94vw, 24rem);
   }
 

@@ -76,6 +76,7 @@ export default class FilmReelCloth {
       zOffset = this.zOffset,
       texW = null,
       maxAnisotropy = 4,
+      maxTexH = 8192,
       mediaHeightBoost = 1,
       clothCols = COLS,
       clothRows = ROWS,
@@ -88,6 +89,7 @@ export default class FilmReelCloth {
     this.zOffset = zOffset;
     this.requestedTexW = texW;
     this.maxAnisotropy = maxAnisotropy;
+    this.maxTexH = maxTexH;
     this.mediaHeightBoost = Math.max(1, mediaHeightBoost);
     this.clothCols = clothCols;
     this.clothRows = clothRows;
@@ -384,7 +386,7 @@ export default class FilmReelCloth {
   buildTexture() {
     this.texW = this.requestedTexW ?? 1280;
     this.texH = Math.min(
-      4096,
+      this.maxTexH || 8192,
       Math.round(this.texW * (this.contentH / this.panelW))
     );
     this.canvas = document.createElement("canvas");
