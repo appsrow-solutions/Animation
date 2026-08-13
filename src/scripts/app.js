@@ -325,7 +325,6 @@ export default class Sketch {
       clothCols: this.isPhone() ? 18 : this.isMobile() ? 22 : 26,
       clothRows: this.isPhone() ? 34 : this.isMobile() ? 40 : 48,
       constraintIterations: this.isPhone() ? 2 : this.isMobile() ? 2 : 3,
-      videoPaintMax: this.isMobile() ? 1 : 2,
       gridCols: this.cols,
       cardW,
       cardH,

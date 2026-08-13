@@ -17,7 +17,6 @@ const SETTLE_STEPS = 30;
 const SCROLL_SMOOTH = 0.14;
 // ~10fps paint — enough motion without constant full-atlas GPU uploads
 const VIDEO_PAINT_MS = 100;
-const VIDEO_PAINT_MAX = 2;
 // Point on the card checked against the seam (0 = top, 1 = bottom). ~0.38 = middle ground.
 const ROLL_PLAYBACK_ANCHOR = 0.38;
 const ROLL_PLAYBACK_LEAD = 0.02;
@@ -82,7 +81,6 @@ export default class FilmReelCloth {
       clothCols = COLS,
       clothRows = ROWS,
       constraintIterations = CONSTRAINT_ITERATIONS,
-      videoPaintMax = VIDEO_PAINT_MAX,
       slotAspects = [],
     } = options;
 
@@ -93,7 +91,6 @@ export default class FilmReelCloth {
     this.clothCols = clothCols;
     this.clothRows = clothRows;
     this.constraintIterations = constraintIterations;
-    this.videoPaintMax = videoPaintMax;
     this.gridCols = Math.max(1, gridCols);
     this.cardW = cardW;
     this.cardH = cardH;
@@ -826,14 +823,6 @@ export default class FilmReelCloth {
     const top = this.rollMargin + scrollPos;
     const bottom = top + this.hangH;
     return { top, bottom };
-  }
-
-  isSlotNearView(i, margin = 0.35, useTarget = true) {
-    const s = this.slots[i];
-    if (!s) return false;
-    const { top, bottom } = this.getVisibleDepthRange(useTarget);
-    const pad = s.h * margin;
-    return s.y + s.h > top - pad && s.y < bottom + pad;
   }
 
   // Flat hang only — pause near the roll seam; never play while curving into the roll.
