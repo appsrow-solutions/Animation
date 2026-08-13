@@ -41,9 +41,7 @@ const CARD_HEIGHT_BOOST = 1.21;
 const CORNER_RADIUS_UV = 0.08;
 const TOP_ROLL_STRENGTH = 1.0;
 const VIDEO_ZOOM = 1.0;
-const VIDEO_CULL_INTERVAL_MS = 100;
-const MAX_PLAYING_DESKTOP = 2;
-const MAX_PLAYING_MOBILE = 1;
+const VIDEO_CULL_INTERVAL_MS = 32;
 const VIDEO_VIEW_MARGIN = 1.1;
 const VIDEO_LOAD_CONCURRENCY = 4;
 const REEL_ROLL_RADIUS = 0.11;
@@ -377,17 +375,10 @@ export default class Sketch {
     this.filmReel.setScrollTarget(this.currentScrollY);
     if (dt > 0) {
       this.filmReel.update(dt, this.clock.elapsedTime);
-      // Only playing videos — FilmReelCloth paints the nearest 2 at ~8fps
       const toPaint = new Set();
       for (const entry of this.videoElements) {
         if (!entry.video || entry.video.readyState < 2) continue;
-        if (
-          entry.playing ||
-          (this.currentScrollY < 40 && entry.index < this.cols) ||
-          this.filmReel.isSlotNearView(entry.index, VIDEO_VIEW_MARGIN)
-        ) {
-          toPaint.add(entry.index);
-        }
+        if (entry.playing) toPaint.add(entry.index);
       }
       this.filmReel.updateVideoFrames(toPaint);
     }
@@ -842,63 +833,23 @@ export default class Sketch {
       });
   }
 
-  // Play nearest in-view cards. Blob source + no texture swap = no reload flicker.
-  updateVideoPlayback(now = performance.now()) {
-    if (now - this.lastVideoCullAt < VIDEO_CULL_INTERVAL_MS) return;
+  // Play visible hang-area slots; pause once a card starts entering the top roll.
+  updateVideoPlayback(now = performance.now(), force = false) {
+    if (!force && now - this.lastVideoCullAt < VIDEO_CULL_INTERVAL_MS) return;
     this.lastVideoCullAt = now;
     if (!this.videoElements.length) return;
 
-    const maxPlaying =
-      this.cols === 1 ? MAX_PLAYING_MOBILE : MAX_PLAYING_DESKTOP;
     const viewMargin = VIDEO_VIEW_MARGIN;
-    const { top, bottom } = this.filmReel
-      ? this.filmReel.getVisibleDepthRange()
-      : { top: 0, bottom: 0 };
-    // At scroll rest the first row sits high on the reel — rank from the top band,
-    // not the hang center (which otherwise prefers rows 03/04 over 01/02).
-    const anchorY =
-      this.currentScrollY < 40
-        ? top + (bottom - top) * 0.18
-        : (top + bottom) * 0.5;
-
     const playing = new Set();
 
-    if (this.currentScrollY < 40) {
-      for (let col = 0; col < this.cols; col++) {
-        const entry = this.videoElements.find((e) => e.index === col);
-        if (!entry?.video || entry.video.readyState < 2) continue;
-        if (this.filmReel && !this.filmReel.isSlotNearView(col, viewMargin)) {
-          continue;
-        }
-        if (!entry.playing) entry.video.play().catch(() => {});
-        entry.playing = true;
-        playing.add(entry.index);
-      }
-    }
-
-    const ranked = [];
-    for (let i = 0; i < this.videoElements.length; i++) {
-      const entry = this.videoElements[i];
-      if (!entry.video) continue;
+    for (const entry of this.videoElements) {
+      if (!entry.video || entry.video.readyState < 2) continue;
 
       const inBand = this.filmReel
-        ? this.filmReel.isSlotNearView(entry.index, viewMargin)
+        ? this.filmReel.isSlotPlayingView(entry.index, viewMargin)
         : true;
-      const slot = this.filmReel?.slots[entry.index];
-      const mid = slot ? slot.y + slot.h * 0.5 : 0;
-      ranked.push({ entry, inBand, dist: Math.abs(mid - anchorY) });
-    }
 
-    ranked.sort((a, b) => a.dist - b.dist);
-
-    let playingCount = playing.size;
-    for (let i = 0; i < ranked.length; i++) {
-      const { entry, inBand } = ranked[i];
-      if (playing.has(entry.index)) continue;
-      const shouldPlay = inBand && playingCount < maxPlaying;
-
-      if (shouldPlay) {
-        playingCount += 1;
+      if (inBand) {
         if (!entry.playing) entry.video.play().catch(() => {});
         entry.playing = true;
         playing.add(entry.index);
@@ -910,6 +861,7 @@ export default class Sketch {
       if (entry.playing) {
         entry.video.pause();
         entry.playing = false;
+        this.filmReel?.paintSlot?.(entry.index);
       }
     }
   }
@@ -1137,6 +1089,9 @@ export default class Sketch {
       this.targetScrollY = this.currentScrollY;
       this.lastScrollAt = performance.now();
       this.scrolling = true;
+      // Re-evaluate playback immediately on scroll — smoothed reel scroll lags on return scroll.
+      this.lastVideoCullAt = 0;
+      this.updateVideoPlayback(this.lastScrollAt, true);
       // Cards slide under a stationary cursor, so re-test hover
       if (this.hasHoverPointer) this.hoverDirty = true;
     });

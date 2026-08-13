@@ -18,6 +18,9 @@ const SCROLL_SMOOTH = 0.14;
 // ~10fps paint — enough motion without constant full-atlas GPU uploads
 const VIDEO_PAINT_MS = 100;
 const VIDEO_PAINT_MAX = 2;
+// Point on the card checked against the seam (0 = top, 1 = bottom). ~0.38 = middle ground.
+const ROLL_PLAYBACK_ANCHOR = 0.38;
+const ROLL_PLAYBACK_LEAD = 0.02;
 const IDLE_COOLDOWN_FRAMES = 18;
 
 const DEMO_PANEL_W = 3.84;
@@ -818,18 +821,38 @@ export default class FilmReelCloth {
     return -1;
   }
 
-  getVisibleDepthRange() {
-    const top = this.rollMargin + this.scroll;
+  getVisibleDepthRange(useTarget = true) {
+    const scrollPos = useTarget ? this.scrollTarget : this.scroll;
+    const top = this.rollMargin + scrollPos;
     const bottom = top + this.hangH;
     return { top, bottom };
   }
 
-  isSlotNearView(i, margin = 0.35) {
+  isSlotNearView(i, margin = 0.35, useTarget = true) {
     const s = this.slots[i];
     if (!s) return false;
-    const { top, bottom } = this.getVisibleDepthRange();
+    const { top, bottom } = this.getVisibleDepthRange(useTarget);
     const pad = s.h * margin;
     return s.y + s.h > top - pad && s.y < bottom + pad;
+  }
+
+  // Flat hang only — pause near the roll seam; never play while curving into the roll.
+  isSlotPlayingView(i, margin = 0.35) {
+    const s = this.slots[i];
+    if (!s) return false;
+    const visual = this.getVisibleDepthRange(false);
+    const target = this.getVisibleDepthRange(true);
+    const pad = s.h * margin;
+    const lead = s.h * ROLL_PLAYBACK_LEAD;
+    const stopEdge = s.y + s.h * ROLL_PLAYBACK_ANCHOR;
+
+    // Match canvas while scrolling down; resume quickly on return scroll.
+    const scrollingUp = this.scrollTarget + 0.5 < this.scroll;
+    const seam = scrollingUp ? target.top : visual.top;
+
+    if (stopEdge <= seam + lead) return false;
+
+    return s.y + s.h > target.top - pad && s.y < target.bottom + pad;
   }
 
   update(dt, elapsed) {
