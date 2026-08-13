@@ -16,7 +16,7 @@ const BEND_STIFFNESS = 0.48;
 const SETTLE_STEPS = 30;
 const SCROLL_SMOOTH = 0.14;
 // ~10fps paint — enough motion without constant full-atlas GPU uploads
-const VIDEO_PAINT_MS = 100;
+const VIDEO_PAINT_MS = 120;
 // Point on the card checked against the seam (0 = top, 1 = bottom). ~0.38 = middle ground.
 const ROLL_PLAYBACK_ANCHOR = 0.38;
 const ROLL_PLAYBACK_LEAD = 0.02;
@@ -76,7 +76,7 @@ export default class FilmReelCloth {
       zOffset = this.zOffset,
       texW = null,
       maxAnisotropy = 4,
-      maxTexH = 8192,
+      maxTexH = 4096,
       mediaHeightBoost = 1,
       clothCols = COLS,
       clothRows = ROWS,

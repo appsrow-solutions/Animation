@@ -17,8 +17,8 @@ const SEG_MOBILE = 20;
 const WORLD_PER_PIXEL = 4.2;
 const SCROLL_IDLE_MS = 180;
 const PIXEL_RATIO_CAP = 1.75;
-const PIXEL_RATIO_CAP_MOBILE = 1.75;
-const PIXEL_RATIO_CAP_PHONE = 2;
+const PIXEL_RATIO_CAP_MOBILE = 1.5;
+const PIXEL_RATIO_CAP_PHONE = 1.5;
 const REEL_PAD_X_DESKTOP = 140;
 const REEL_PAD_X_TABLET = 56;
 const REEL_PAD_X_PHONE = 22;
@@ -315,10 +315,10 @@ export default class Sketch {
   getReelTextureWidth(panelW, cardW) {
     const cardScreenW = (cardW / this.getVisibleWidth()) * this.width;
     const dpr = Math.min(window.devicePixelRatio || 1, this.getPixelRatioCap());
-    const slotPx = Math.round(cardScreenW * dpr * 1.35);
+    const slotPx = Math.round(cardScreenW * dpr * 1.12);
     const minTexW = Math.round((panelW / cardW) * slotPx);
-    const maxTex = this.isPhone() ? 1536 : this.isMobile() ? 1400 : 1600;
-    const minTex = this.isPhone() ? 1024 : 768;
+    const maxTex = this.isPhone() ? 1024 : this.isMobile() ? 1152 : 1600;
+    const minTex = this.isPhone() ? 768 : 768;
     return Math.min(maxTex, Math.max(minTex, minTexW));
   }
 
@@ -355,10 +355,10 @@ export default class Sketch {
       rollRadius: this.getRollRadius(cardH),
       texW: this.getReelTextureWidth(width, cardW),
       maxAnisotropy: Math.min(
-        8,
+        4,
         this.renderer.capabilities.getMaxAnisotropy()
       ),
-      maxTexH: Math.min(8192, this.renderer.capabilities.maxTextureSize || 4096),
+      maxTexH: Math.min(4096, this.renderer.capabilities.maxTextureSize || 4096),
       mediaHeightBoost: 1,
       clothCols: this.isPhone() ? 18 : this.isMobile() ? 22 : 26,
       clothRows: this.isPhone() ? 34 : this.isMobile() ? 40 : 48,
@@ -870,7 +870,7 @@ export default class Sketch {
       });
   }
 
-  // Play visible hang-area slots; pause once a card starts entering the top roll.
+  // Play hang-area slots; pause once a card starts entering the top roll.
   updateVideoPlayback(now = performance.now(), force = false) {
     if (!force && now - this.lastVideoCullAt < VIDEO_CULL_INTERVAL_MS) return;
     this.lastVideoCullAt = now;
