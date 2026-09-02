@@ -2,7 +2,6 @@ varying float vZPos;
 varying float vRecess;
 varying float vFold;
 varying float vBendRound;
-varying float vClothWarp;
 varying vec2 vUv;
 
 uniform sampler2D u_texture;
@@ -21,6 +20,7 @@ uniform float u_alphaFadeFar;
 uniform float u_fogNear;
 uniform float u_fogFar;
 uniform float u_opacity;
+
 vec2 coverUv(vec2 uv, float imageAspect, float cardAspect) {
   float ratio = imageAspect / max(cardAspect, 0.0001);
   vec2 scale = vec2(1.0);
@@ -56,8 +56,6 @@ float edgeFeather(float sdf) {
 }
 
 // Soft top-corner mask only while the card is wrapping the cylinder.
-// Branchless: an early-out per corner box leaves a hard seam wherever
-// the feather band reaches past the box.
 float topCornerRoundMask(vec2 uv, float radiusUv) {
   float r = clamp(radiusUv, 0.0, 0.22);
   if (r < 0.001) return 1.0;
@@ -90,7 +88,6 @@ void main() {
   if (u_hasTexture > 0.5) {
     // u_fitContain: 0 = cover (may crop), 1 = contain (letterbox), 2 = stretch fill
     if (u_fitContain > 1.5) {
-      // Stretch onto card, then undo CARD_HEIGHT_BOOST so circles stay round
       vec2 uv = vUv;
       float boost = max(u_heightBoost, 0.0001);
       uv.x = (uv.x - 0.5) / boost + 0.5;
@@ -120,18 +117,13 @@ void main() {
     col = mix(col, overlay.rgb, overlay.a);
   }
 
-  float weaveX = sin(vUv.x * 180.0 + vUv.y * 26.0) * 0.5 + 0.5;
-  float weaveY = sin(vUv.y * 220.0 - vUv.x * 18.0) * 0.5 + 0.5;
-  float weave = weaveX * weaveY;
-  float edgeShade = pow(abs(vUv.x - 0.5) * 2.0, 1.7);
-  float clothLight = clamp(0.5 + vClothWarp * 0.9, 0.0, 1.0);
-  vec3 warmLift = vec3(0.03, 0.024, 0.018) * (0.3 + 0.7 * clothLight);
+  col += vZPos * 2.2 * (1.0 - vRecess);
 
-  col *= 0.988 + weave * 0.018;
-  col += warmLift * mix(0.24, 0.12, u_hasTexture);
-  col *= 1.0 - edgeShade * 0.045;
+  float foldLight = smoothstep(0.05, 1.0, vFold) * (1.0 - vRecess * 0.5);
+  col = mix(col, u_bgColor, foldLight * 0.22);
 
-  col += vZPos * 0.35;
+  col *= 1.0 - vRecess * 0.12;
+  col = mix(col, u_bgColor, vRecess * 0.35);
 
   float depth = gl_FragCoord.z / gl_FragCoord.w;
 
@@ -139,10 +131,14 @@ void main() {
   float fogFactor = smoothstep(u_fogNear, u_fogFar, depth);
   fogFactor *= mix(1.0, 0.1, u_hasTexture);
 
-  col = mix(col, u_bgColor, fogFactor * 0.35);
+  col = mix(col, u_bgColor, fogFactor);
 
-  float alpha = min(alphaFade * u_opacity, 1.0);
+  float foldAlpha = 1.0 - foldLight * 0.12;
+  float stackFade = smoothstep(0.2, 0.78, vRecess);
+  float alpha = min(alphaFade * u_opacity * foldAlpha * (1.0 - stackFade), 1.0);
+
   alpha *= roundedRectMask(vUv, 0.022);
+  alpha *= topCornerRoundMask(vUv, vBendRound);
 
   if (alpha < 0.002) discard;
 
