@@ -229,6 +229,15 @@ html.is-ready .section-heading {
   color: #1c1c1a;
 }
 
+.section-heading__beta {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.32em;
+  letter-spacing: 0.08em;
+  vertical-align: super;
+  margin-left: 0.28em;
+  opacity: 0.5;
+}
+
 @media (max-width: 1023px) {
   .film-scrollbar {
     display: none !important;

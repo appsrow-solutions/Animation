@@ -24,6 +24,8 @@ import "../styles/global.css";
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap"
       rel="stylesheet"
     />
+    <link rel="preload" href="/assets/projects/perfume-clouds-intro-react.mp4" as="video" type="video/mp4" />
+    <link rel="preload" href="/assets/projects/webgl-rain.mp4" as="video" type="video/mp4" />
   </head>
   <body>
     <div class="loader" id="loader" aria-live="polite" aria-busy="true">
@@ -54,7 +56,9 @@ import "../styles/global.css";
     </a>
 
     <header class="section-heading">
-      <h1 class="section-heading__title">Works in Motion</h1>
+      <h1 class="section-heading__title">
+        Works in Motion<sup class="section-heading__beta">Beta</sup>
+      </h1>
     </header>
 
     <a
@@ -89,8 +93,18 @@ import "../styles/global.css";
       const loaderPct = document.getElementById("loader-pct");
       const recCursor = document.getElementById("rec-cursor");
 
+      /** @type {Sketch | undefined} */
+      let sketch;
+
+      if (import.meta.hot) {
+        import.meta.hot.dispose(() => {
+          sketch?.destroy?.();
+          sketch = undefined;
+        });
+      }
+
       if (container && scrollSpacer) {
-        new Sketch({
+        sketch = new Sketch({
           dom: container,
           scrollSpacer,
           loader,
