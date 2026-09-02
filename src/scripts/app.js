@@ -40,15 +40,15 @@ const VIDEO_ZOOM = 1.0;
 // Decode only near-viewport cards. Files stay in memory (blob) so pause
 // never re-downloads — VideoTexture keeps the last frame while paused.
 const VIDEO_CULL_INTERVAL_MS = 100;
-const MAX_PLAYING_DESKTOP = 6;
-const MAX_PLAYING_MOBILE = 3;
+const MAX_PLAYING_DESKTOP = 3;
+const MAX_PLAYING_MOBILE = 2;
 const VIDEO_LOAD_CONCURRENCY = 2;
 const VIDEO_VIEW_MARGIN = 1.35;
-// Only fetch/decodes the first rows before unlock — rest load in background
+// Only fetch/decodes the first rows before unlock — rest load on scroll
 const VIDEO_INITIAL_ROWS = 2;
 const VIDEO_PREFETCH_MARGIN = 2.8;
-const VIDEO_PREFETCH_INTERVAL_MS = 350;
-const VIDEO_IDLE_PREFETCH_MS = 450;
+const VIDEO_PREFETCH_INTERVAL_MS = 500;
+const VIDEO_IDLE_PREFETCH_MS = 600;
 
 // Webflow button-icon variant: arrow-up-right (↗)
 const ARROW_GLYPH = "↗";
@@ -352,8 +352,7 @@ export default class Sketch {
 
     const visibleHalf = this.getVisibleHeight() * 0.5;
     const offsetY = this.contentGroup.position.y;
-    const cardH = this.getCardHeightFor(index);
-    const margin = cardH * VIDEO_PREFETCH_MARGIN;
+    const margin = this.getCardHeightFor(index) * VIDEO_PREFETCH_MARGIN;
     const worldY = card.position.y + offsetY;
     return worldY > -visibleHalf - margin && worldY < visibleHalf + margin;
   }
@@ -388,7 +387,9 @@ export default class Sketch {
 
   scheduleIdleVideoPrefetch() {
     const pending = this.videoElements
-      .filter((entry) => !entry.source.ready && !entry.prefetchScheduled)
+      .filter(
+        (entry) => !entry.source.ready && !entry.prefetchScheduled
+      )
       .sort((a, b) => a.index - b.index);
 
     pending.forEach((entry, i) => {
@@ -631,6 +632,7 @@ export default class Sketch {
       ready: false,
       loading: null,
       waiters: [],
+      attachPromise: null,
     };
     this.videoSources.set(url, source);
     return source;
@@ -1204,7 +1206,6 @@ export default class Sketch {
       return;
     }
 
-    const now = performance.now();
     this.contentGroup.position.y = this.baseYOffset + this.currentScrollY;
 
     this.fluid.update();
@@ -1219,6 +1220,7 @@ export default class Sketch {
       uniforms.u_bendPoint.value.y = bendY;
     }
 
+    const now = performance.now();
     this.updateVideoPlayback(now);
     this.prefetchVideos(now);
   }
