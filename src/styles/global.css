@@ -7,73 +7,6 @@
 html,
 body {
   background: #f0f0ee;
-  overflow-x: hidden;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  overscroll-behavior-y: none;
-  touch-action: pan-y;
-}
-
-/* Hide native scrollbar — custom film strip on the right */
-html {
-  scrollbar-gutter: stable;
-  scrollbar-width: none;
-}
-
-html::-webkit-scrollbar {
-  display: none;
-}
-
-html.is-loading {
-  scrollbar-width: none;
-}
-
-/* Film-strip sprocket scrollbar */
-.film-scrollbar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 14px;
-  z-index: 4;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.45s ease;
-}
-
-html.is-ready .film-scrollbar {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.film-scrollbar__track {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background-color: #0a0a0a;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='18' viewBox='0 0 14 18'%3E%3Crect x='1.5' y='2' width='11' height='4.5' rx='1.4' fill='%23e6e6e6'/%3E%3C/svg%3E");
-  background-repeat: repeat-y;
-  background-size: 14px 18px;
-  background-position: center top;
-  cursor: pointer;
-  touch-action: none;
-}
-
-.film-scrollbar__indicator {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  width: 5px;
-  height: 5px;
-  margin-left: -2.5px;
-  border-radius: 50%;
-  background: #ff2a3a;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 0 8px rgba(255, 42, 58, 0.65);
-  pointer-events: none;
-  will-change: transform;
-  animation: rec-blink 1s steps(1, end) infinite;
 }
 
 html.lenis,
@@ -105,8 +38,8 @@ canvas {
 
 .site-logo {
   position: fixed;
-  top: max(clamp(1.25rem, 3vh, 2.25rem), env(safe-area-inset-top, 0px));
-  left: max(clamp(1.25rem, 3vw, 2.5rem), env(safe-area-inset-left, 0px));
+  top: clamp(1.25rem, 3vh, 2.25rem);
+  left: clamp(1.25rem, 3vw, 2.5rem);
   z-index: 3;
   display: block;
   line-height: 0;
@@ -130,8 +63,8 @@ html.is-ready .site-logo {
 
 .site-cta {
   position: fixed;
-  top: max(clamp(1.25rem, 3vh, 2.25rem), env(safe-area-inset-top, 0px));
-  right: max(clamp(1.25rem, 3vw, 2.5rem), env(safe-area-inset-right, 0px));
+  top: clamp(1.25rem, 3vh, 2.25rem);
+  right: clamp(1.25rem, 3vw, 2.5rem);
   z-index: 3;
   display: inline-flex;
   align-items: center;
@@ -170,8 +103,8 @@ html.is-ready .site-cta {
 
 .site-credit {
   position: fixed;
-  bottom: max(clamp(1.25rem, 3vh, 2.25rem), env(safe-area-inset-bottom, 0px));
-  right: max(clamp(1.25rem, 3vw, 2.5rem), env(safe-area-inset-right, 0px));
+  bottom: clamp(1.25rem, 3vh, 2.25rem);
+  right: clamp(1.25rem, 3vw, 2.5rem);
   z-index: 3;
   font-family: Georgia, serif;
   font-size: 0.75rem;
@@ -188,10 +121,7 @@ html.is-ready .site-credit {
   opacity: 1;
 }
 
-.site-credit span {
-  color: #1c1c1a;
-}
-
+.site-credit span,
 .site-credit:hover {
   color: #1c1c1a;
 }
@@ -203,7 +133,7 @@ html.is-ready .site-credit {
 
 .section-heading {
   position: fixed;
-  top: clamp(1.85rem, 4.5vh, 3.35rem);
+  top: clamp(3.25rem, 8vh, 5.25rem);
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
@@ -239,68 +169,46 @@ html.is-ready .section-heading {
 }
 
 @media (max-width: 1023px) {
-  .film-scrollbar {
-    display: none !important;
-  }
-
   .site-logo {
-    top: max(1rem, env(safe-area-inset-top, 0px));
-    left: max(1.1rem, env(safe-area-inset-left, 0px));
+    top: 1rem;
+    left: 1rem;
   }
 
   .site-logo img {
-    width: 2.6rem;
+    width: 2rem;
   }
 
   .site-cta {
-    top: max(1rem, env(safe-area-inset-top, 0px));
-    right: max(1.1rem, env(safe-area-inset-right, 0px));
-    padding: 0.62em 1.05em;
-    font-size: 0.74rem;
-    letter-spacing: 0.07em;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.5em 0.75em;
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
   }
 
   .section-heading {
-    top: 4.15rem;
-    width: min(90vw, 38rem);
-    padding: 0 5rem;
+    top: 3.75rem;
+    width: min(92vw, 36rem);
+    padding: 0 0.75rem;
   }
 
   .section-heading__title {
-    font-size: clamp(2.15rem, 6.2vw, 2.85rem);
+    font-size: clamp(1.65rem, 7vw, 2.5rem);
   }
 }
 
 @media (max-width: 600px) {
-  .site-credit {
-    display: none;
-  }
-
-  .site-logo {
-    top: max(0.55rem, env(safe-area-inset-top, 0px));
-    left: max(0.6rem, env(safe-area-inset-left, 0px));
-  }
-
-  .site-logo img {
-    width: 1.25rem;
-  }
-
   .site-cta {
-    top: max(0.5rem, env(safe-area-inset-top, 0px));
-    right: max(0.55rem, env(safe-area-inset-right, 0px));
-    padding: 0.36em 0.5em;
-    font-size: 0.48rem;
+    padding: 0.45em 0.65em;
+    font-size: 0.58rem;
   }
 
   .section-heading {
-    top: 2.15rem;
-    padding: 0 0.35rem 0.35rem;
-    width: min(94vw, 24rem);
+    top: 3.5rem;
   }
 
   .section-heading__title {
-    font-size: clamp(1.65rem, 8.5vw, 2.05rem);
-    letter-spacing: -0.035em;
+    font-size: clamp(1.45rem, 7.5vw, 2rem);
   }
 }
 
@@ -309,9 +217,7 @@ html.is-ready .section-heading {
   top: 0;
   left: 0;
   width: 100vw;
-  width: 100dvw;
   height: 100vh;
-  height: 100dvh;
   z-index: 1;
   opacity: 0;
   transition: opacity 0.55s ease;
@@ -325,7 +231,6 @@ html.is-ready #container {
   position: relative;
   z-index: 0;
   height: 100vh;
-  height: 100dvh;
 }
 
 .loader {
@@ -373,107 +278,4 @@ html.is-ready #container {
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   color: rgba(28, 28, 26, 0.55);
-}
-
-/* Cinema REC cursor — badge only */
-html.has-rec-cursor,
-html.has-rec-cursor body,
-html.has-rec-cursor #container,
-html.has-rec-cursor canvas,
-html.has-rec-cursor a {
-  cursor: none !important;
-}
-
-.rec-cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 40;
-  display: none;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.32rem 0.5rem 0.32rem 0.48rem;
-  pointer-events: none;
-  opacity: 0;
-  transform: translate3d(-100px, -100px, 0);
-  background: linear-gradient(
-    165deg,
-    rgba(28, 10, 12, 0.92) 0%,
-    rgba(10, 8, 8, 0.88) 100%
-  );
-  border: 1px solid rgba(255, 70, 80, 0.35);
-  border-radius: 2px;
-  backdrop-filter: blur(10px) saturate(1.1);
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 6px 18px rgba(0, 0, 0, 0.28);
-  transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-  will-change: transform;
-}
-
-html.is-ready .rec-cursor.is-on {
-  display: inline-flex;
-  opacity: 1;
-}
-
-.rec-cursor__rec {
-  font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  color: rgba(255, 250, 246, 0.96);
-  line-height: 1;
-}
-
-.rec-cursor__led {
-  width: 0.42rem;
-  height: 0.42rem;
-  border-radius: 50%;
-  background: #ff2a3a;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.12),
-    0 0 10px rgba(255, 42, 58, 0.75);
-  animation: rec-blink 1s steps(1, end) infinite;
-}
-
-.rec-cursor.is-hot {
-  background: linear-gradient(
-    165deg,
-    rgba(70, 14, 18, 0.95) 0%,
-    rgba(22, 8, 10, 0.92) 100%
-  );
-  border-color: rgba(255, 90, 100, 0.55);
-}
-
-.rec-cursor.is-hot .rec-cursor__led {
-  animation: rec-blink-fast 0.45s steps(1, end) infinite;
-}
-
-@keyframes rec-blink {
-  0%,
-  49% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0.18;
-  }
-}
-
-@keyframes rec-blink-fast {
-  0%,
-  49% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0.12;
-  }
-}
-
-@media (pointer: coarse) {
-  .rec-cursor {
-    display: none !important;
-  }
 }

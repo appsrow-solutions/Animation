@@ -6,18 +6,15 @@ import "../styles/global.css";
 <html lang="en" class="is-loading">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Agency work in motion" />
     <title>Works in Motion</title>
-      <!-- Favicon -->
-  <link
-    rel="icon"
-    type="image/png"
-    href="https://cdn.prod.website-files.com/6a213c5f7179de515d9f790a/6a5a01205f9632d6c9bf4a82_appsrow-favicon.png"
-  />
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      type="image/png"
+      href="https://cdn.prod.website-files.com/6a213c5f7179de515d9f790a/6a5a01205f9632d6c9bf4a82_appsrow-favicon.png"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -70,17 +67,6 @@ import "../styles/global.css";
       Powered by <span>Appsrow</span>
     </a>
 
-    <div class="rec-cursor" id="rec-cursor" aria-hidden="true">
-      <span class="rec-cursor__rec">REC</span>
-      <span class="rec-cursor__led"></span>
-    </div>
-
-    <div class="film-scrollbar" id="film-scrollbar" aria-hidden="true">
-      <div class="film-scrollbar__track" id="film-scrollbar-track">
-        <div class="film-scrollbar__indicator" id="film-scrollbar-indicator"></div>
-      </div>
-    </div>
-
     <div id="container"></div>
     <div id="scroll-spacer"></div>
     <script>
@@ -91,7 +77,6 @@ import "../styles/global.css";
       const loader = document.getElementById("loader");
       const loaderBar = document.getElementById("loader-bar");
       const loaderPct = document.getElementById("loader-pct");
-      const recCursor = document.getElementById("rec-cursor");
 
       /** @type {Sketch | undefined} */
       let sketch;
@@ -110,10 +95,6 @@ import "../styles/global.css";
           loader,
           loaderBar,
           loaderPct,
-          recCursor:
-            window.matchMedia && window.matchMedia("(pointer: fine)").matches
-              ? recCursor
-              : null,
         });
       }
     </script>
